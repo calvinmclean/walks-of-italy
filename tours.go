@@ -3,6 +3,7 @@ package tours
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -101,6 +102,28 @@ func (td TourDetail) GetAvailability(start, end Date) (AvailabilityResponse, err
 	err = json.Unmarshal(body, &result)
 	if err != nil {
 		return AvailabilityResponse{}, fmt.Errorf("error parsing response: %w", err)
+	}
+
+	return result, nil
+}
+
+// availabilityFilter allows filtering available dates by criteria like price and number of tickets.
+// The filter should return "true" if the date is considered to be available.
+func (td TourDetail) FindAvailability(start, end Date, availabilityFilter func(AvailabilityDetail) bool) ([]AvailabilityDetail, error) {
+	if availabilityFilter == nil {
+		return nil, errors.New("missing availabilityFilter")
+	}
+
+	availability, err := td.GetAvailability(start, end)
+	if err != nil {
+		return nil, fmt.Errorf("error getting availability: %w", err)
+	}
+
+	var result []AvailabilityDetail
+	for _, a := range availability {
+		if availabilityFilter(a) {
+			result = append(result, a)
+		}
 	}
 
 	return result, nil
