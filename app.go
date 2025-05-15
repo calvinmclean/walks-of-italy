@@ -20,6 +20,23 @@ func NewApp(sc *storage.Client) *App {
 	return &App{sc: sc, logger: *slog.Default()}
 }
 
+func (a *App) PrintSummary(ctx context.Context) error {
+	for _, tour := range Tours {
+		availability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
+		if err != nil {
+			return fmt.Errorf("error getting availability for tour %q: %w", tour, err)
+		}
+
+		a.logger.Info(
+			tour.Name,
+			"tour_id", tour.ProductID,
+			"latest_availability", availability.AvailabilityDate,
+			"recorded_at", availability.RecordedAt,
+		)
+	}
+	return nil
+}
+
 func (a *App) UpdateLatestAvailabilities(ctx context.Context) error {
 	for _, tour := range Tours {
 		updated, err := a.UpdateLatestAvailability(ctx, tour)

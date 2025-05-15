@@ -38,8 +38,8 @@ func main() {
 		log.Fatalf("error updating availability: %v", err)
 	}
 
-	// storedAvailability, err := client.GetLatestAvailability(context.Background(), tours.PristineSistineEarly.ProductID)
-	// if err != nil {
-	// 	log.Fatalf("error getting stored availability: %v", err)
-	// }
+	err = app.PrintSummary(context.Background())
+	if err != nil {
+		log.Fatalf("error getting summary: %v", err)
+	}
 }
