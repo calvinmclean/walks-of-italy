@@ -7,7 +7,7 @@ package db
 
 import (
 	"context"
-	"database/sql"
+	"time"
 )
 
 const addLatestAvailability = `-- name: AddLatestAvailability :exec
@@ -16,13 +16,13 @@ INSERT INTO latest_availabilities (
     recorded_at,
     availability_date,
     raw_data
-) VALUES (?, datetime('now'), ?, ?)
+) VALUES (?, CURRENT_TIMESTAMP, ?, ?)
 `
 
 type AddLatestAvailabilityParams struct {
 	TourUuid         interface{}
-	AvailabilityDate interface{}
-	RawData          sql.NullString
+	AvailabilityDate time.Time
+	RawData          string
 }
 
 func (q *Queries) AddLatestAvailability(ctx context.Context, arg AddLatestAvailabilityParams) error {

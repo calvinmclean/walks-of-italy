@@ -8,7 +8,7 @@ import (
 
 	_ "embed"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 //go:generate sqlc generate
@@ -16,7 +16,6 @@ import (
 //go:embed schema.sql
 var ddl string
 
-// Client implements the babyapi.Client interface with the sqlc-generated queries
 type Client struct {
 	*db.Queries
 	db *sql.DB
@@ -25,7 +24,7 @@ type Client struct {
 // ":memory:" is in-memory for filename
 // "file::memory:?cache=shared"
 func New(filename string) (*Client, error) {
-	database, err := sql.Open("sqlite", filename)
+	database, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		return nil, err
 	}

@@ -5,12 +5,12 @@
 package db
 
 import (
-	"database/sql"
+	"time"
 )
 
 type LatestAvailability struct {
 	TourUuid         interface{}
-	RecordedAt       interface{}
-	AvailabilityDate interface{}
-	RawData          sql.NullString
+	RecordedAt       time.Time
+	AvailabilityDate time.Time
+	RawData          string
 }

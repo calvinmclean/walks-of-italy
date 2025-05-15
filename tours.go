@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -19,34 +21,42 @@ var (
 	KeyMasterVatican = TourDetail{
 		Name:      "VIP Vatican Key Master’s Tour: Unlock the Sistine Chapel",
 		URL:       "https://www.walksofitaly.com/vatican-tours/key-masters-tour-sistine-chapel-vatican-museums/",
-		ProductID: "e9d2d819-5f04-4b1f-a07f-612387494b8f",
+		ProductID: uuid.MustParse("e9d2d819-5f04-4b1f-a07f-612387494b8f"),
 	}
 	PrivateVatican = TourDetail{
 		Name:      "Private Vatican Tour: Vatican Museums, Sistine Chapel & St. Peter’s",
 		URL:       "https://www.walksofitaly.com/vatican-tours/private-vatican-tour/",
-		ProductID: "c40d8e0e-6756-463b-a052-982c77a707aa",
+		ProductID: uuid.MustParse("c40d8e0e-6756-463b-a052-982c77a707aa"),
 	}
 	CompleteVatican = TourDetail{
 		Name:      "The Complete Vatican Tour with Vatican Museums, Sistine Chapel & St. Peter’s Basilica",
 		URL:       "https://www.walksofitaly.com/vatican-tours/complete-vatican-tour/",
-		ProductID: "3b263ef8-c280-49cc-a74f-ac95aa2f1b58",
+		ProductID: uuid.MustParse("3b263ef8-c280-49cc-a74f-ac95aa2f1b58"),
 	}
 	AloneInTheSistineChapel = TourDetail{
 		Name:      "Alone in the Sistine Chapel: VIP Entry at the Vatican’s Most Exclusive Hours",
 		URL:       "https://www.walksofitaly.com/vatican-tours/vatican-after-hours-tour/",
-		ProductID: "8c14824f-905d-4273-8b83-10b567db6e55",
+		ProductID: uuid.MustParse("8c14824f-905d-4273-8b83-10b567db6e55"),
 	}
 	PristineSistineEarly = TourDetail{
 		Name:      "Pristine Sistine™ Early Entrance Small Group Vatican Tour",
 		URL:       "https://www.walksofitaly.com/vatican-tours/pristine-sistine-chapel-tour/",
-		ProductID: "a1249220-e5d8-4983-93b2-c31ddfb3ccb8",
+		ProductID: uuid.MustParse("a1249220-e5d8-4983-93b2-c31ddfb3ccb8"),
+	}
+
+	Tours = []TourDetail{
+		KeyMasterVatican,
+		PrivateVatican,
+		CompleteVatican,
+		AloneInTheSistineChapel,
+		PristineSistineEarly,
 	}
 )
 
 type TourDetail struct {
 	Name      string
 	URL       string
-	ProductID string
+	ProductID uuid.UUID
 }
 
 func (ar AvailabilityRequest) JSON() io.Reader {

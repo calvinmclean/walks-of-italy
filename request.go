@@ -2,17 +2,19 @@ package tours
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type AvailabilityRequest struct {
-	ProductID      string `json:"productId"`
-	OptionID       string `json:"optionId"`
-	LocalDateStart Date   `json:"localDateStart"`
-	LocalDateEnd   Date   `json:"localDateEnd"`
-	Currency       string `json:"currency"`
+	ProductID      uuid.UUID `json:"productId"`
+	OptionID       string    `json:"optionId"`
+	LocalDateStart Date      `json:"localDateStart"`
+	LocalDateEnd   Date      `json:"localDateEnd"`
+	Currency       string    `json:"currency"`
 }
 
-func NewAvailabilityRequest(productID string, start, end Date) AvailabilityRequest {
+func NewAvailabilityRequest(productID uuid.UUID, start, end Date) AvailabilityRequest {
 	return AvailabilityRequest{
 		ProductID:      productID,
 		OptionID:       "DEFAULT",
