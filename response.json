@@ -1,0 +1,104 @@
+[
+  {
+    "id": "2025-09-02T06:00:00+02:00",
+    "localDateTimeStart": "2025-09-02T06:00:00+02:00",
+    "localDateTimeEnd": "2025-09-02T08:00:00+02:00",
+    "allDay": false,
+    "available": true,
+    "status": "AVAILABLE",
+    "vacancies": 12,
+    "capacity": 22,
+    "limitCapacity": null,
+    "totalCapacity": 40,
+    "paxCount": 10,
+    "limitPaxCount": 28,
+    "totalPaxCount": 28,
+    "noShows": 0,
+    "totalNoShows": 0,
+    "maxUnits": 12,
+    "maxPaxCount": 12,
+    "utcCutoffAt": "2025-09-02T03:00:00Z",
+    "openingHours": [
+      {
+        "from": "00:00",
+        "to": "23:59",
+        "frequency": null,
+        "frequencyAmount": null,
+        "frequencyUnit": "hour"
+      }
+    ],
+    "meetingPoint": "Please arrive 15 minutes prior to the start of your tour, your guide will be holding a green Walks sign. This tour meets at Vatican Museums Entrance. Your guide will be waiting on the short flight of stairs in front of the entrance door. These doors are surrounded by white marble and have \"Mvsei Vaticani\" engraved above the door in the stone.",
+    "meetingPointCoordinates": "41.9067806, 12.45358229",
+    "meetingPointLatitude": 41.9067806,
+    "meetingPointLongitude": 12.45358229,
+    "meetingLocalDateTime": "2025-09-02T05:45:00+02:00",
+    "tourGroup": null,
+    "fare": null,
+    "notices": [],
+    "unitPricing": [
+      {
+        "unitId": "unit_3bde2091-7131-41ca-baad-cbd10c9fec1a",
+        "unitType": "ADULT",
+        "original": 84000,
+        "retail": 84000,
+        "net": null,
+        "currency": "USD",
+        "currencyPrecision": 2,
+        "includedTaxes": [],
+        "offerDiscount": {
+          "retail": 0,
+          "net": null,
+          "includedTaxes": []
+        }
+      },
+      {
+        "unitId": "unit_f4ffd8ae-68a2-4dc7-b0d7-2e4f4f6c20d6",
+        "unitType": "CHILD",
+        "original": 82900,
+        "retail": 82900,
+        "net": null,
+        "currency": "USD",
+        "currencyPrecision": 2,
+        "includedTaxes": [],
+        "offerDiscount": {
+          "retail": 0,
+          "net": null,
+          "includedTaxes": []
+        }
+      },
+      {
+        "unitId": "unit_8b8797da-266a-452f-8e55-458241cb8820",
+        "unitType": "INFANT",
+        "original": 0,
+        "retail": 0,
+        "net": null,
+        "currency": "USD",
+        "currencyPrecision": 2,
+        "includedTaxes": [],
+        "offerDiscount": {
+          "retail": 0,
+          "net": null,
+          "includedTaxes": []
+        }
+      }
+    ],
+    "offers": [],
+    "offerCode": null,
+    "offerTitle": null,
+    "offer": null,
+    "pricing": {
+      "original": 0,
+      "retail": 0,
+      "net": null,
+      "includedTaxes": [],
+      "offerDiscount": {
+        "retail": 0,
+        "net": null,
+        "includedTaxes": []
+      },
+      "currency": "USD",
+      "currencyPrecision": 2
+    },
+    "hasResources": false
+  }
+]
