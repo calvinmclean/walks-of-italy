@@ -2,6 +2,7 @@ package tours
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -66,9 +67,9 @@ func (ar AvailabilityRequest) JSON() io.Reader {
 	return &r
 }
 
-func (td TourDetail) GetAvailability(start, end Date) (AvailabilityResponse, error) {
+func (td TourDetail) GetAvailability(ctx context.Context, start, end Date) (AvailabilityResponse, error) {
 	requestBody := NewAvailabilityRequest(td.ProductID, start, end)
-	req, err := http.NewRequest(http.MethodPost, availabilityURL, requestBody.JSON())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, availabilityURL, requestBody.JSON())
 	if err != nil {
 		return AvailabilityResponse{}, fmt.Errorf("error creating request: %w", err)
 	}
@@ -109,12 +110,12 @@ func (td TourDetail) GetAvailability(start, end Date) (AvailabilityResponse, err
 
 // availabilityFilter allows filtering available dates by criteria like price and number of tickets.
 // The filter should return "true" if the date is considered to be available.
-func (td TourDetail) FindAvailability(start, end Date, availabilityFilter func(AvailabilityDetail) bool) ([]AvailabilityDetail, error) {
+func (td TourDetail) FindAvailability(ctx context.Context, start, end Date, availabilityFilter func(AvailabilityDetail) bool) ([]AvailabilityDetail, error) {
 	if availabilityFilter == nil {
 		return nil, errors.New("missing availabilityFilter")
 	}
 
-	availability, err := td.GetAvailability(start, end)
+	availability, err := td.GetAvailability(ctx, start, end)
 	if err != nil {
 		return nil, fmt.Errorf("error getting availability: %w", err)
 	}
@@ -129,11 +130,11 @@ func (td TourDetail) FindAvailability(start, end Date, availabilityFilter func(A
 	return result, nil
 }
 
-func (td TourDetail) GetLatestAvailability() (AvailabilityDetail, error) {
+func (td TourDetail) GetLatestAvailability(ctx context.Context) (AvailabilityDetail, error) {
 	start := DateFromTime(time.Now())
 	end := start.Add(1, 0, 0)
 
-	availability, err := td.GetAvailability(start, end)
+	availability, err := td.GetAvailability(ctx, start, end)
 	if err != nil {
 		return AvailabilityDetail{}, fmt.Errorf("error getting availability: %w", err)
 	}

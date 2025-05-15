@@ -19,7 +19,7 @@ func main() {
 func findTourForSevenPeople() {
 	start := tours.DateFromTime(time.Now())
 	end := start.Add(1, 0, 0)
-	availability, err := tours.KeyMasterVatican.FindAvailability(start, end, func(a tours.AvailabilityDetail) bool {
+	availability, err := tours.KeyMasterVatican.FindAvailability(context.Background(), start, end, func(a tours.AvailabilityDetail) bool {
 		return a.Vacancies >= 7
 	})
 	if err != nil {

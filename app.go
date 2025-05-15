@@ -50,7 +50,7 @@ func (a *App) UpdateLatestAvailabilities(ctx context.Context) error {
 }
 
 func (a *App) UpdateLatestAvailability(ctx context.Context, tour TourDetail) (bool, error) {
-	availability, err := tour.GetLatestAvailability()
+	availability, err := tour.GetLatestAvailability(ctx)
 	if err != nil {
 		return false, fmt.Errorf("error getting availability: %w", err)
 	}
