@@ -67,11 +67,11 @@ func (ar AvailabilityRequest) JSON() io.Reader {
 	return &r
 }
 
-func (td TourDetail) GetAvailability(ctx context.Context, start, end Date) (AvailabilityResponse, error) {
+func (td TourDetail) GetAvailability(ctx context.Context, start, end Date) (Availabilities, error) {
 	requestBody := NewAvailabilityRequest(td.ProductID, start, end)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, availabilityURL, requestBody.JSON())
 	if err != nil {
-		return AvailabilityResponse{}, fmt.Errorf("error creating request: %w", err)
+		return Availabilities{}, fmt.Errorf("error creating request: %w", err)
 	}
 
 	capabilities := []string{
@@ -90,19 +90,19 @@ func (td TourDetail) GetAvailability(ctx context.Context, start, end Date) (Avai
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return AvailabilityResponse{}, fmt.Errorf("error executing request: %w", err)
+		return Availabilities{}, fmt.Errorf("error executing request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return AvailabilityResponse{}, fmt.Errorf("error reading response: %w", err)
+		return Availabilities{}, fmt.Errorf("error reading response: %w", err)
 	}
 
-	var result AvailabilityResponse
+	var result Availabilities
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		return AvailabilityResponse{}, fmt.Errorf("error parsing response: %w", err)
+		return Availabilities{}, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	return result, nil
@@ -110,7 +110,7 @@ func (td TourDetail) GetAvailability(ctx context.Context, start, end Date) (Avai
 
 // availabilityFilter allows filtering available dates by criteria like price and number of tickets.
 // The filter should return "true" if the date is considered to be available.
-func (td TourDetail) FindAvailability(ctx context.Context, start, end Date, availabilityFilter func(AvailabilityDetail) bool) ([]AvailabilityDetail, error) {
+func (td TourDetail) FindAvailability(ctx context.Context, start, end Date, availabilityFilter func(AvailabilityDetail) bool) (Availabilities, error) {
 	if availabilityFilter == nil {
 		return nil, errors.New("missing availabilityFilter")
 	}

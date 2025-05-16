@@ -1,6 +1,10 @@
 package tours
 
 import (
+	"fmt"
+	"os"
+	"strings"
+	"text/template"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,7 +28,39 @@ func NewAvailabilityRequest(productID uuid.UUID, start, end Date) AvailabilityRe
 	}
 }
 
-type AvailabilityResponse []AvailabilityDetail
+type Availabilities []AvailabilityDetail
+
+func (a Availabilities) PrettySummary() error {
+	tmpl := template.Must(template.New("availability").
+		Funcs(template.FuncMap{"truncate": func(s string, max int) string {
+			if len(s) <= max {
+				padding := max - len(s)
+				return s + strings.Repeat(" ", padding)
+			}
+			return s[:max-3] + "..."
+		}}).
+		Parse(`
+ Date                 | Price   | Vacancies
+----------------------|---------|-------------
+{{ range . -}}
+{{ .LocalDateTimeStart.Format "2006-01-02 15:04:05" }}   | {{ .AdultPrice }} | {{ .Vacancies }}
+{{ end }}`))
+
+	return tmpl.Execute(os.Stdout, a)
+}
+
+// AdultPrice returns the price for one adult in USD
+func (a AvailabilityDetail) AdultPrice() string {
+	var adultPricing UnitPricing
+	for _, p := range a.UnitPricing {
+		if p.UnitType == "ADULT" {
+			adultPricing = p
+			break
+		}
+	}
+
+	return fmt.Sprintf("$%.2f", float64(adultPricing.Retail)/100.0)
+}
 
 type AvailabilityDetail struct {
 	ID                      time.Time      `json:"id"`

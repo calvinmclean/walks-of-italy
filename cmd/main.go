@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"time"
@@ -12,8 +11,8 @@ import (
 )
 
 func main() {
-	updateData()
-	// findTourForSevenPeople()
+	// updateData()
+	findTourForSevenPeople()
 }
 
 func findTourForSevenPeople() {
@@ -26,7 +25,10 @@ func findTourForSevenPeople() {
 		log.Fatalf("error getting summary: %v", err)
 	}
 
-	fmt.Println(availability)
+	err = availability.PrettySummary()
+	if err != nil {
+		log.Fatalf("error printing summary: %v", err)
+	}
 }
 
 func updateData() {
