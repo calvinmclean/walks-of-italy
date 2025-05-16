@@ -13,7 +13,7 @@ import (
 
 func main() {
 	updateData()
-	findTourForSevenPeople()
+	// findTourForSevenPeople()
 }
 
 func findTourForSevenPeople() {
@@ -45,7 +45,7 @@ func updateData() {
 		log.Fatalf("error updating availability: %v", err)
 	}
 
-	err = app.PrintSummary(context.Background())
+	err = app.PrettySummary(context.Background())
 	if err != nil {
 		log.Fatalf("error getting summary: %v", err)
 	}

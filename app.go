@@ -7,6 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
+	"text/template"
+
 	"walks-of-italy/storage"
 	"walks-of-italy/storage/db"
 )
@@ -20,7 +24,7 @@ func NewApp(sc *storage.Client) *App {
 	return &App{sc: sc, logger: *slog.Default()}
 }
 
-func (a *App) PrintSummary(ctx context.Context) error {
+func (a *App) LogSummary(ctx context.Context) error {
 	for _, tour := range Tours {
 		availability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
 		if err != nil {
@@ -35,6 +39,39 @@ func (a *App) PrintSummary(ctx context.Context) error {
 		)
 	}
 	return nil
+}
+
+func (a *App) PrettySummary(ctx context.Context) error {
+	tmpl := template.Must(template.New("availability").
+		Funcs(template.FuncMap{"truncate": func(s string, max int) string {
+			if len(s) <= max {
+				padding := max - len(s)
+				return s + strings.Repeat(" ", padding)
+			}
+			return s[:max-3] + "..."
+		}}).
+		Parse(`
+Tour Name                                                   | Available Date | Opened At
+------------------------------------------------------------|----------------|----------------
+{{ range . -}}
+{{ truncate .TourName 59 }} | {{ .AvailabilityDate.Format "2006-01-02" }}     | {{ .RecordedAt.Format "2006-01-02 15:04:05" }}
+{{ end }}`))
+
+	tourData := []map[string]any{}
+
+	for _, tour := range Tours {
+		availability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
+		if err != nil {
+			return fmt.Errorf("error getting availability for tour %q: %w", tour, err)
+		}
+
+		tourData = append(tourData, map[string]any{
+			"TourName":         tour.Name,
+			"AvailabilityDate": availability.AvailabilityDate,
+			"RecordedAt":       availability.RecordedAt,
+		})
+	}
+	return tmpl.Execute(os.Stdout, tourData)
 }
 
 func (a *App) UpdateLatestAvailabilities(ctx context.Context) error {
