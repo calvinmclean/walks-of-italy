@@ -9,7 +9,9 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"text/template"
+	"time"
 
 	"walks-of-italy/storage"
 	"walks-of-italy/storage/db"
@@ -75,15 +77,32 @@ Tour Name                                                   | Available Date | O
 }
 
 func (a *App) UpdateLatestAvailabilities(ctx context.Context) error {
-	for _, tour := range Tours {
-		updated, err := a.UpdateLatestAvailability(ctx, tour)
-		if err != nil {
-			return fmt.Errorf("error updating availability for %q: %w", tour.ProductID, err)
-		}
+	var wg sync.WaitGroup
+	wg.Add(len(Tours))
 
-		a.logger.Debug("updated tour details", "tour_id", tour.ProductID, "changed", updated)
+	errChan := make(chan error, len(Tours))
+	for _, tour := range Tours {
+		go func() {
+			defer wg.Done()
+
+			updated, err := a.UpdateLatestAvailability(ctx, tour)
+			if err != nil {
+				errChan <- fmt.Errorf("error updating availability for %q: %w", tour.ProductID, err)
+			}
+
+			a.logger.Debug("updated tour details", "tour_id", tour.ProductID, "changed", updated)
+		}()
 	}
-	return nil
+
+	wg.Wait()
+	close(errChan)
+
+	errs := []error{}
+	for err := range errChan {
+		errs = append(errs, err)
+	}
+
+	return errors.Join(errs...)
 }
 
 func (a *App) UpdateLatestAvailability(ctx context.Context, tour TourDetail) (bool, error) {
@@ -133,4 +152,48 @@ func (a *App) storeLatestAvailability(ctx context.Context, tour TourDetail, avai
 	}
 
 	return nil
+}
+
+func (a *App) Watch(ctx context.Context, interval time.Duration) error {
+	now := time.Now()
+
+	next := now.Truncate(interval).Add(interval)
+	untilNext := time.Until(next)
+
+	a.logger.Debug("waiting to start", "duration", untilNext.String())
+	select {
+	case <-time.After(untilNext):
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	updateAvailabilities := func(t time.Time) error {
+		a.logger.Debug("updating availabilities")
+		err := a.UpdateLatestAvailabilities(ctx)
+		if err != nil {
+			return fmt.Errorf("error updating availabilities: %w", err)
+		}
+		a.logger.Debug("finished updating availabilities", "duration", time.Since(t).String())
+		return nil
+	}
+
+	err := updateAvailabilities(time.Now())
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case t := <-ticker.C:
+			err := updateAvailabilities(t)
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }

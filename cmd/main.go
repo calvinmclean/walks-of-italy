@@ -12,7 +12,8 @@ import (
 
 func main() {
 	// updateData()
-	findTourForSevenPeople()
+	// findTourForSevenPeople()
+	watch()
 }
 
 func findTourForSevenPeople() {
@@ -50,5 +51,22 @@ func updateData() {
 	err = app.PrettySummary(context.Background())
 	if err != nil {
 		log.Fatalf("error getting summary: %v", err)
+	}
+}
+
+func watch() {
+	client, err := storage.New("test.db")
+	if err != nil {
+		log.Fatalf("error creating db client: %v", err)
+	}
+	defer client.Close()
+
+	app := tours.NewApp(client)
+
+	slog.SetLogLoggerLevel(slog.LevelDebug)
+
+	err = app.Watch(context.Background(), 15*time.Second)
+	if err != nil {
+		log.Fatalf("error watching: %v", err)
 	}
 }
