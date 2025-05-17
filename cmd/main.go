@@ -2,19 +2,76 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/urfave/cli/v2"
 
 	tours "walks-of-italy"
 	"walks-of-italy/storage"
 )
 
 func main() {
-	// updateData()
-	// findTourForSevenPeople()
-	watch()
+	var debug bool
+	var dbFilename, pushoverAppToken, pushoverRecipientToken string
+	var watchInterval time.Duration
+	app := &cli.App{
+		Name: "walks-of-italy",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:        "debug",
+				Usage:       "enable debug logs",
+				Destination: &debug,
+				EnvVars:     []string{"DEBUG"},
+			},
+			&cli.StringFlag{
+				Name:        "db",
+				Usage:       "filename for SQLite database",
+				Destination: &dbFilename,
+				EnvVars:     []string{"DB"},
+				Value:       ":memory:",
+			},
+		},
+		DefaultCommand: "watch",
+		Commands: []*cli.Command{
+			{
+				Name: "watch",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "pushover-app-token",
+						Usage:       "App token for Pushover notifications",
+						Destination: &pushoverAppToken,
+						EnvVars:     []string{"PUSHOVER_APP_TOKEN"},
+					},
+					&cli.StringFlag{
+						Name:        "pushover-recipient-token",
+						Usage:       "Recipient token for Pushover notifications",
+						Destination: &pushoverRecipientToken,
+						EnvVars:     []string{"PUSHOVER_RECIPIENT_TOKEN"},
+					},
+					&cli.DurationFlag{
+						Name:        "interval",
+						Usage:       "Interval for polling new dates",
+						Destination: &watchInterval,
+						Value:       15 * time.Second,
+						EnvVars:     []string{"INTERVAL"},
+					},
+				},
+				Description: "Watch for new tour availabilities",
+				Action: func(ctx *cli.Context) error {
+					return watch(ctx.Context, dbFilename, pushoverAppToken, pushoverRecipientToken, watchInterval, debug)
+				},
+			},
+		},
+	}
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func findTourForSevenPeople() {
@@ -55,29 +112,31 @@ func updateData() {
 	}
 }
 
-func watch() {
-	client, err := storage.New("test.db")
+func watch(ctx context.Context, dbFilename, pushoverAppToken, pushoverRecipientToken string, interval time.Duration, debug bool) error {
+	sc, err := storage.New(dbFilename)
 	if err != nil {
-		log.Fatalf("error creating db client: %v", err)
+		return fmt.Errorf("error creating db client: %w", err)
 	}
-	defer client.Close()
+	defer sc.Close()
 
 	var nc *tours.NotifyClient
-	appToken := os.Getenv("PUSHOVER_APP_TOKEN")
-	recipientToken := os.Getenv("PUSHOVER_RECIPIENT_TOKEN")
-	if appToken != "" && recipientToken != "" {
-		nc, err = tours.NewNotifyClient(appToken, recipientToken)
+	if pushoverAppToken != "" && pushoverRecipientToken != "" {
+		nc, err = tours.NewNotifyClient(pushoverAppToken, pushoverRecipientToken)
 		if err != nil {
-			log.Fatalf("error creating notify client: %v", err)
+			return fmt.Errorf("error creating notify client: %w", err)
 		}
 	}
 
-	app := tours.NewApp(client, nc)
+	app := tours.NewApp(sc, nc)
 
-	slog.SetLogLoggerLevel(slog.LevelDebug)
-
-	err = app.Watch(context.Background(), 15*time.Second)
-	if err != nil {
-		log.Fatalf("error watching: %v", err)
+	if debug {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
+
+	err = app.Watch(ctx, interval)
+	if err != nil {
+		return fmt.Errorf("error watching: %w", err)
+	}
+
+	return nil
 }
