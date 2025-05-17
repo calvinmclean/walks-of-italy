@@ -1,4 +1,4 @@
-package tours
+package app
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 
 	"walks-of-italy/storage"
 	"walks-of-italy/storage/db"
+	"walks-of-italy/tours"
 )
 
 type App struct {
@@ -23,12 +24,12 @@ type App struct {
 	logger slog.Logger
 }
 
-func NewApp(sc *storage.Client, nc *NotifyClient) *App {
+func New(sc *storage.Client, nc *NotifyClient) *App {
 	return &App{sc: sc, nc: nc, logger: *slog.Default()}
 }
 
 func (a *App) LogSummary(ctx context.Context) error {
-	for _, tour := range Tours {
+	for _, tour := range tours.Tours {
 		availability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
 		if err != nil {
 			return fmt.Errorf("error getting availability for tour %q: %w", tour, err)
@@ -62,7 +63,7 @@ Tour Name                                                   | Available Date | O
 
 	tourData := []map[string]any{}
 
-	for _, tour := range Tours {
+	for _, tour := range tours.Tours {
 		availability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
 		if err != nil {
 			return fmt.Errorf("error getting availability for tour %q: %w", tour, err)
@@ -77,12 +78,12 @@ Tour Name                                                   | Available Date | O
 	return tmpl.Execute(os.Stdout, tourData)
 }
 
-func (a *App) UpdateLatestAvailabilities(ctx context.Context, onUpdate func(TourDetail, AvailabilityDetail)) error {
+func (a *App) UpdateLatestAvailabilities(ctx context.Context, onUpdate func(tours.TourDetail, tours.AvailabilityDetail)) error {
 	var wg sync.WaitGroup
-	wg.Add(len(Tours))
+	wg.Add(len(tours.Tours))
 
-	errChan := make(chan error, len(Tours))
-	for _, tour := range Tours {
+	errChan := make(chan error, len(tours.Tours))
+	for _, tour := range tours.Tours {
 		go func() {
 			defer wg.Done()
 
@@ -109,7 +110,7 @@ func (a *App) UpdateLatestAvailabilities(ctx context.Context, onUpdate func(Tour
 	return errors.Join(errs...)
 }
 
-func (a *App) UpdateLatestAvailability(ctx context.Context, tour TourDetail) (*AvailabilityDetail, error) {
+func (a *App) UpdateLatestAvailability(ctx context.Context, tour tours.TourDetail) (*tours.AvailabilityDetail, error) {
 	availability, err := tour.GetLatestAvailability(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting availability: %w", err)
@@ -140,7 +141,7 @@ func (a *App) UpdateLatestAvailability(ctx context.Context, tour TourDetail) (*A
 	return &availability, nil
 }
 
-func (a *App) storeLatestAvailability(ctx context.Context, tour TourDetail, availability AvailabilityDetail) error {
+func (a *App) storeLatestAvailability(ctx context.Context, tour tours.TourDetail, availability tours.AvailabilityDetail) error {
 	availabilityJSON, err := json.Marshal(availability)
 	if err != nil {
 		return fmt.Errorf("error marshalling availability JSON: %w", err)
@@ -161,7 +162,7 @@ func (a *App) storeLatestAvailability(ctx context.Context, tour TourDetail, avai
 func (a *App) Watch(ctx context.Context, interval time.Duration) error {
 	updateAvailabilities := func(t time.Time) error {
 		a.logger.Debug("updating availabilities")
-		err := a.UpdateLatestAvailabilities(ctx, func(tour TourDetail, availability AvailabilityDetail) {
+		err := a.UpdateLatestAvailabilities(ctx, func(tour tours.TourDetail, availability tours.AvailabilityDetail) {
 			if a.nc == nil {
 				return
 			}

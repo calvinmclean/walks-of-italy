@@ -1,4 +1,4 @@
-package tours
+package app
 
 import (
 	"errors"

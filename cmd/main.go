@@ -10,8 +10,9 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	tours "walks-of-italy"
+	"walks-of-italy/app"
 	"walks-of-italy/storage"
+	"walks-of-italy/tours"
 )
 
 func main() {
@@ -75,7 +76,7 @@ func main() {
 					}
 					defer client.Close()
 
-					app := tours.NewApp(client, nil)
+					app := app.New(client, nil)
 
 					if debug {
 						slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -131,15 +132,15 @@ func watch(ctx context.Context, dbFilename, pushoverAppToken, pushoverRecipientT
 	}
 	defer sc.Close()
 
-	var nc *tours.NotifyClient
+	var nc *app.NotifyClient
 	if pushoverAppToken != "" && pushoverRecipientToken != "" {
-		nc, err = tours.NewNotifyClient(pushoverAppToken, pushoverRecipientToken)
+		nc, err = app.NewNotifyClient(pushoverAppToken, pushoverRecipientToken)
 		if err != nil {
 			return fmt.Errorf("error creating notify client: %w", err)
 		}
 	}
 
-	app := tours.NewApp(sc, nc)
+	app := app.New(sc, nc)
 
 	if debug {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
