@@ -34,24 +34,24 @@ func main() {
 				EnvVars:     []string{"DB"},
 				Value:       ":memory:",
 			},
+			&cli.StringFlag{
+				Name:        "pushover-app-token",
+				Usage:       "App token for Pushover notifications",
+				Destination: &pushoverAppToken,
+				EnvVars:     []string{"PUSHOVER_APP_TOKEN"},
+			},
+			&cli.StringFlag{
+				Name:        "pushover-recipient-token",
+				Usage:       "Recipient token for Pushover notifications",
+				Destination: &pushoverRecipientToken,
+				EnvVars:     []string{"PUSHOVER_RECIPIENT_TOKEN"},
+			},
 		},
 		DefaultCommand: "watch",
 		Commands: []*cli.Command{
 			{
 				Name: "watch",
 				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:        "pushover-app-token",
-						Usage:       "App token for Pushover notifications",
-						Destination: &pushoverAppToken,
-						EnvVars:     []string{"PUSHOVER_APP_TOKEN"},
-					},
-					&cli.StringFlag{
-						Name:        "pushover-recipient-token",
-						Usage:       "Recipient token for Pushover notifications",
-						Destination: &pushoverRecipientToken,
-						EnvVars:     []string{"PUSHOVER_RECIPIENT_TOKEN"},
-					},
 					&cli.DurationFlag{
 						Name:        "interval",
 						Usage:       "Interval for polling new dates",
@@ -65,50 +65,62 @@ func main() {
 					return watch(ctx.Context, dbFilename, pushoverAppToken, pushoverRecipientToken, watchInterval, debug)
 				},
 			},
+			{
+				Name:        "update",
+				Description: "Update local data",
+				Action: func(ctx *cli.Context) error {
+					client, err := storage.New(dbFilename)
+					if err != nil {
+						return fmt.Errorf("error creating db client: %w", err)
+					}
+					defer client.Close()
+
+					app := tours.NewApp(client, nil)
+
+					if debug {
+						slog.SetLogLoggerLevel(slog.LevelDebug)
+					}
+
+					err = app.UpdateLatestAvailabilities(ctx.Context, nil)
+					if err != nil {
+						return fmt.Errorf("error updating availability: %w", err)
+					}
+
+					err = app.PrettySummary(ctx.Context)
+					if err != nil {
+						return fmt.Errorf("error getting summary: %w", err)
+					}
+
+					return nil
+				},
+			},
+			{
+				Name:        "search",
+				Description: "search for tours",
+				Action: func(ctx *cli.Context) error {
+					start := tours.DateFromTime(time.Now())
+					end := start.Add(1, 0, 0)
+					availability, err := tours.KeyMasterVatican.FindAvailability(ctx.Context, start, end, func(a tours.AvailabilityDetail) bool {
+						return a.Vacancies >= 7
+					})
+					if err != nil {
+						return fmt.Errorf("error getting summary: %w", err)
+					}
+
+					err = availability.PrettySummary()
+					if err != nil {
+						return fmt.Errorf("error printing summary: %w", err)
+					}
+
+					return nil
+				},
+			},
 		},
 	}
 
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
-	}
-}
-
-func findTourForSevenPeople() {
-	start := tours.DateFromTime(time.Now())
-	end := start.Add(1, 0, 0)
-	availability, err := tours.KeyMasterVatican.FindAvailability(context.Background(), start, end, func(a tours.AvailabilityDetail) bool {
-		return a.Vacancies >= 7
-	})
-	if err != nil {
-		log.Fatalf("error getting summary: %v", err)
-	}
-
-	err = availability.PrettySummary()
-	if err != nil {
-		log.Fatalf("error printing summary: %v", err)
-	}
-}
-
-func updateData() {
-	client, err := storage.New("test.db")
-	if err != nil {
-		log.Fatalf("error creating db client: %v", err)
-	}
-	defer client.Close()
-
-	app := tours.NewApp(client, nil)
-
-	slog.SetLogLoggerLevel(slog.LevelDebug)
-
-	err = app.UpdateLatestAvailabilities(context.Background(), nil)
-	if err != nil {
-		log.Fatalf("error updating availability: %v", err)
-	}
-
-	err = app.PrettySummary(context.Background())
-	if err != nil {
-		log.Fatalf("error getting summary: %v", err)
 	}
 }
 
