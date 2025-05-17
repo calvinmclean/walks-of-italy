@@ -1,0 +1,14 @@
+services:
+  walks-of-italy:
+    image: "ghcr.io/calvinmclean/walks-of-italy:latest"
+    volumes:
+      - "./data:/data"
+    command:
+      - "watch"
+    user: 1000:1000
+    environment:
+      DB: /data/walks-of-italy.db
+      DEBUG: true
+      INTERVAL: 1h
+      PUSHOVER_APP_TOKEN: ""
+      PUSHOVER_RECIPIENT_TOKEN: ""
