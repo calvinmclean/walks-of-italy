@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"os"
 	"time"
 
 	tours "walks-of-italy"
@@ -39,11 +40,11 @@ func updateData() {
 	}
 	defer client.Close()
 
-	app := tours.NewApp(client)
+	app := tours.NewApp(client, nil)
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	err = app.UpdateLatestAvailabilities(context.Background())
+	err = app.UpdateLatestAvailabilities(context.Background(), nil)
 	if err != nil {
 		log.Fatalf("error updating availability: %v", err)
 	}
@@ -61,7 +62,17 @@ func watch() {
 	}
 	defer client.Close()
 
-	app := tours.NewApp(client)
+	var nc *tours.NotifyClient
+	appToken := os.Getenv("PUSHOVER_APP_TOKEN")
+	recipientToken := os.Getenv("PUSHOVER_RECIPIENT_TOKEN")
+	if appToken != "" && recipientToken != "" {
+		nc, err = tours.NewNotifyClient(appToken, recipientToken)
+		if err != nil {
+			log.Fatalf("error creating notify client: %v", err)
+		}
+	}
+
+	app := tours.NewApp(client, nc)
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 

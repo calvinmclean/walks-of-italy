@@ -19,11 +19,12 @@ import (
 
 type App struct {
 	sc     *storage.Client
+	nc     *NotifyClient
 	logger slog.Logger
 }
 
-func NewApp(sc *storage.Client) *App {
-	return &App{sc: sc, logger: *slog.Default()}
+func NewApp(sc *storage.Client, nc *NotifyClient) *App {
+	return &App{sc: sc, nc: nc, logger: *slog.Default()}
 }
 
 func (a *App) LogSummary(ctx context.Context) error {
@@ -76,7 +77,7 @@ Tour Name                                                   | Available Date | O
 	return tmpl.Execute(os.Stdout, tourData)
 }
 
-func (a *App) UpdateLatestAvailabilities(ctx context.Context) error {
+func (a *App) UpdateLatestAvailabilities(ctx context.Context, onUpdate func(TourDetail, AvailabilityDetail)) error {
 	var wg sync.WaitGroup
 	wg.Add(len(Tours))
 
@@ -89,8 +90,11 @@ func (a *App) UpdateLatestAvailabilities(ctx context.Context) error {
 			if err != nil {
 				errChan <- fmt.Errorf("error updating availability for %q: %w", tour.ProductID, err)
 			}
+			a.logger.Debug("updated tour details", "tour_id", tour.ProductID, "changed", updated != nil)
 
-			a.logger.Debug("updated tour details", "tour_id", tour.ProductID, "changed", updated)
+			if onUpdate != nil && updated != nil {
+				onUpdate(tour, *updated)
+			}
 		}()
 	}
 
@@ -105,35 +109,35 @@ func (a *App) UpdateLatestAvailabilities(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-func (a *App) UpdateLatestAvailability(ctx context.Context, tour TourDetail) (bool, error) {
+func (a *App) UpdateLatestAvailability(ctx context.Context, tour TourDetail) (*AvailabilityDetail, error) {
 	availability, err := tour.GetLatestAvailability(ctx)
 	if err != nil {
-		return false, fmt.Errorf("error getting availability: %w", err)
+		return nil, fmt.Errorf("error getting availability: %w", err)
 	}
 
 	storedAvailability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = a.storeLatestAvailability(ctx, tour, availability)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
-		return true, nil
+		return &availability, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("error getting stored availability: %w", err)
+		return nil, fmt.Errorf("error getting stored availability: %w", err)
 	}
 
 	// If stored date is already the latest, don't save
 	if storedAvailability.AvailabilityDate.Compare(availability.LocalDateTimeStart) >= 0 {
-		return false, nil
+		return nil, nil
 	}
 
 	err = a.storeLatestAvailability(ctx, tour, availability)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	return true, nil
+	return &availability, nil
 }
 
 func (a *App) storeLatestAvailability(ctx context.Context, tour TourDetail, availability AvailabilityDetail) error {
@@ -155,6 +159,30 @@ func (a *App) storeLatestAvailability(ctx context.Context, tour TourDetail, avai
 }
 
 func (a *App) Watch(ctx context.Context, interval time.Duration) error {
+	updateAvailabilities := func(t time.Time) error {
+		a.logger.Debug("updating availabilities")
+		err := a.UpdateLatestAvailabilities(ctx, func(tour TourDetail, availability AvailabilityDetail) {
+			if a.nc == nil {
+				return
+			}
+
+			err := a.nc.Send("New tour availabilities posted", fmt.Sprintf("Tour: %s\nDate: %s", tour.Name, availability.LocalDateTimeStart.Format(time.DateOnly)))
+			if err != nil {
+				a.logger.Error("error sending notification", "err", err)
+			}
+		})
+		if err != nil {
+			return fmt.Errorf("error updating availabilities: %w", err)
+		}
+		a.logger.Debug("finished updating availabilities", "duration", time.Since(t).String())
+		return nil
+	}
+
+	err := updateAvailabilities(time.Now())
+	if err != nil {
+		return err
+	}
+
 	now := time.Now()
 
 	next := now.Truncate(interval).Add(interval)
@@ -169,21 +197,6 @@ func (a *App) Watch(ctx context.Context, interval time.Duration) error {
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-
-	updateAvailabilities := func(t time.Time) error {
-		a.logger.Debug("updating availabilities")
-		err := a.UpdateLatestAvailabilities(ctx)
-		if err != nil {
-			return fmt.Errorf("error updating availabilities: %w", err)
-		}
-		a.logger.Debug("finished updating availabilities", "duration", time.Since(t).String())
-		return nil
-	}
-
-	err := updateAvailabilities(time.Now())
-	if err != nil {
-		return err
-	}
 
 	for {
 		select {
