@@ -17,7 +17,7 @@ const toursSummaryHTML = `<!doctype html>
     	{{ range . -}}
         <div class="uk-container uk-margin-top uk-margin-bottom">
             <div
-                class="uk-card uk-card-default uk-card-body uk-width-1-2@m uk-margin-auto"
+                class="uk-card uk-card-default uk-card-body uk-margin-auto"
             >
                 <h3 class="uk-card-title"><a href={{ .Url }}>{{ .Name }}</a></h3>
                 <p class="uk-text-meta">{{ .Uuid }}</p>
