@@ -2,7 +2,7 @@ package tours
 
 import (
 	"fmt"
-	"os"
+	"io"
 	"strings"
 	"text/template"
 	"time"
@@ -30,7 +30,7 @@ func NewAvailabilityRequest(productID uuid.UUID, start, end Date) AvailabilityRe
 
 type Availabilities []AvailabilityDetail
 
-func (a Availabilities) PrettySummary() error {
+func (a Availabilities) PrettySummary(w io.Writer) error {
 	tmpl := template.Must(template.New("availability").
 		Funcs(template.FuncMap{"truncate": func(s string, max int) string {
 			if len(s) <= max {
@@ -46,7 +46,7 @@ func (a Availabilities) PrettySummary() error {
 {{ .LocalDateTimeStart.Format "2006-01-02 15:04:05" }}   | {{ .AdultPrice }} | {{ .Vacancies }}
 {{ end }}`))
 
-	return tmpl.Execute(os.Stdout, a)
+	return tmpl.Execute(w, a)
 }
 
 // AdultPrice returns the price for one adult in USD

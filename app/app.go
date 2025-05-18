@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"text/template"
@@ -20,6 +20,7 @@ import (
 	"walks-of-italy/tours"
 
 	"github.com/calvinmclean/babyapi"
+	"github.com/go-chi/render"
 )
 
 type App struct {
@@ -60,11 +61,46 @@ func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
 			a.logger.Debug("updated tour details", "tour_id", td.ProductID, "changed", updated != nil)
 			return nil
 		}).
+		AddCustomRoute(http.MethodGet, "/summary", babyapi.Handler(a.SummarizeLatestAvailabilities)).
+		AddCustomIDRoute(http.MethodGet, "/summary", a.api.GetRequestedResourceAndDo(a.SummarizeTourDates)).
 		Serve()
+
 	if err != nil {
 		cancel()
 	}
 	return errors.Join(watchErr, err)
+}
+
+func (a *App) SummarizeLatestAvailabilities(w http.ResponseWriter, r *http.Request) render.Renderer {
+	allTours, err := a.sc.GetAll(r.Context(), url.Values{})
+	if err != nil {
+		return babyapi.ErrInvalidRequest(fmt.Errorf("error getting tours: %w", err))
+	}
+
+	err = a.PrettySummary(r.Context(), w, allTours)
+	if err != nil {
+		return babyapi.ErrInvalidRequest(fmt.Errorf("error creating summary: %w", err))
+	}
+
+	return nil
+}
+
+func (a *App) SummarizeTourDates(w http.ResponseWriter, r *http.Request, td *tours.TourDetail) (render.Renderer, *babyapi.ErrResponse) {
+	start := tours.DateFromTime(time.Now())
+	end := start.Add(1, 0, 0)
+	availability, err := td.FindAvailability(r.Context(), a.accessToken, start, end, func(a tours.AvailabilityDetail) bool {
+		return true
+	})
+	if err != nil {
+		return nil, babyapi.ErrInvalidRequest(fmt.Errorf("error getting availability: %w", err))
+	}
+
+	err = availability.PrettySummary(w)
+	if err != nil {
+		return nil, babyapi.ErrInvalidRequest(fmt.Errorf("error creating summary: %w", err))
+	}
+
+	return nil, nil
 }
 
 func (a *App) LogSummary(ctx context.Context, tours []tours.TourDetail) error {
@@ -84,7 +120,7 @@ func (a *App) LogSummary(ctx context.Context, tours []tours.TourDetail) error {
 	return nil
 }
 
-func (a *App) PrettySummary(ctx context.Context, tours []*tours.TourDetail) error {
+func (a *App) PrettySummary(ctx context.Context, w io.Writer, tours []*tours.TourDetail) error {
 	tmpl := template.Must(template.New("availability").
 		Funcs(template.FuncMap{"truncate": func(s string, max int) string {
 			if len(s) <= max {
@@ -114,7 +150,7 @@ Tour Name                                                   | Available Date | O
 			"RecordedAt":       availability.RecordedAt,
 		})
 	}
-	return tmpl.Execute(os.Stdout, tourData)
+	return tmpl.Execute(w, tourData)
 }
 
 func (a *App) UpdateLatestAvailabilities(ctx context.Context, tours []*tours.TourDetail, onUpdate func(tours.TourDetail, tours.AvailabilityDetail)) error {

@@ -98,7 +98,7 @@ func main() {
 						return fmt.Errorf("error updating availability: %w", err)
 					}
 
-					err = app.PrettySummary(ctx.Context, allTours)
+					err = app.PrettySummary(ctx.Context, os.Stdout, allTours)
 					if err != nil {
 						return fmt.Errorf("error getting summary: %w", err)
 					}
@@ -122,10 +122,10 @@ func main() {
 						return a.Vacancies >= 7
 					})
 					if err != nil {
-						return fmt.Errorf("error getting summary: %w", err)
+						return fmt.Errorf("error getting availability: %w", err)
 					}
 
-					err = availability.PrettySummary()
+					err = availability.PrettySummary(os.Stdout)
 					if err != nil {
 						return fmt.Errorf("error printing summary: %w", err)
 					}
