@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net/url"
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 
 	"walks-of-italy/app"
@@ -62,11 +64,11 @@ func main() {
 				},
 				Description: "Watch for new tour availabilities",
 				Action: func(ctx *cli.Context) error {
-					app, close, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}
-					defer close()
+					defer sc.Close()
 					return app.Watch(ctx.Context, watchInterval)
 				},
 			},
@@ -74,18 +76,23 @@ func main() {
 				Name:        "update",
 				Description: "Update local data",
 				Action: func(ctx *cli.Context) error {
-					app, close, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}
-					defer close()
+					defer sc.Close()
 
-					err = app.UpdateLatestAvailabilities(ctx.Context, nil)
+					allTours, err := sc.GetAll(ctx.Context, url.Values{})
+					if err != nil {
+						return fmt.Errorf("error getting tours: %w", err)
+					}
+
+					err = app.UpdateLatestAvailabilities(ctx.Context, allTours, nil)
 					if err != nil {
 						return fmt.Errorf("error updating availability: %w", err)
 					}
 
-					err = app.PrettySummary(ctx.Context)
+					err = app.PrettySummary(ctx.Context, allTours)
 					if err != nil {
 						return fmt.Errorf("error getting summary: %w", err)
 					}
@@ -97,9 +104,15 @@ func main() {
 				Name:        "search",
 				Description: "search for tours",
 				Action: func(ctx *cli.Context) error {
+					tour := tours.TourDetail{
+						Name:      "VIP Vatican Key Master's Tour: Unlock the Sistine Chapel",
+						URL:       "https://www.walksofitaly.com/vatican-tours/key-masters-tour-sistine-chapel-vatican-museums/",
+						ProductID: uuid.MustParse("e9d2d819-5f04-4b1f-a07f-612387494b8f"),
+					}
+
 					start := tours.DateFromTime(time.Now())
 					end := start.Add(1, 0, 0)
-					availability, err := tours.KeyMasterVatican.FindAvailability(ctx.Context, start, end, func(a tours.AvailabilityDetail) bool {
+					availability, err := tour.FindAvailability(ctx.Context, start, end, func(a tours.AvailabilityDetail) bool {
 						return a.Vacancies >= 7
 					})
 					if err != nil {
@@ -134,11 +147,11 @@ func main() {
 				},
 				Description: "Watch for new tour availabilities",
 				Action: func(ctx *cli.Context) error {
-					app, close, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}
-					defer close()
+					defer sc.Close()
 
 					return app.Run(ctx.Context, watchInterval)
 				},
@@ -152,7 +165,7 @@ func main() {
 	}
 }
 
-func setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken string, debug bool) (*app.App, func(), error) {
+func setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken string, debug bool) (*app.App, *storage.Client, error) {
 	sc, err := storage.New(dbFilename)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating db client: %w", err)
@@ -172,5 +185,5 @@ func setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken string,
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
 
-	return app, sc.Close, nil
+	return app, sc, nil
 }

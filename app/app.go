@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -45,8 +46,8 @@ func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
 	return errors.Join(watchErr, err)
 }
 
-func (a *App) LogSummary(ctx context.Context) error {
-	for _, tour := range tours.Tours {
+func (a *App) LogSummary(ctx context.Context, tours []tours.TourDetail) error {
+	for _, tour := range tours {
 		availability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
 		if err != nil {
 			return fmt.Errorf("error getting availability for tour %q: %w", tour, err)
@@ -62,7 +63,7 @@ func (a *App) LogSummary(ctx context.Context) error {
 	return nil
 }
 
-func (a *App) PrettySummary(ctx context.Context) error {
+func (a *App) PrettySummary(ctx context.Context, tours []*tours.TourDetail) error {
 	tmpl := template.Must(template.New("availability").
 		Funcs(template.FuncMap{"truncate": func(s string, max int) string {
 			if len(s) <= max {
@@ -80,7 +81,7 @@ Tour Name                                                   | Available Date | O
 
 	tourData := []map[string]any{}
 
-	for _, tour := range tours.Tours {
+	for _, tour := range tours {
 		availability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
 		if err != nil {
 			return fmt.Errorf("error getting availability for tour %q: %w", tour, err)
@@ -95,23 +96,23 @@ Tour Name                                                   | Available Date | O
 	return tmpl.Execute(os.Stdout, tourData)
 }
 
-func (a *App) UpdateLatestAvailabilities(ctx context.Context, onUpdate func(tours.TourDetail, tours.AvailabilityDetail)) error {
+func (a *App) UpdateLatestAvailabilities(ctx context.Context, tours []*tours.TourDetail, onUpdate func(tours.TourDetail, tours.AvailabilityDetail)) error {
 	var wg sync.WaitGroup
-	wg.Add(len(tours.Tours))
+	wg.Add(len(tours))
 
-	errChan := make(chan error, len(tours.Tours))
-	for _, tour := range tours.Tours {
+	errChan := make(chan error, len(tours))
+	for _, tour := range tours {
 		go func() {
 			defer wg.Done()
 
-			updated, err := a.UpdateLatestAvailability(ctx, tour)
+			updated, err := a.UpdateLatestAvailability(ctx, *tour)
 			if err != nil {
 				errChan <- fmt.Errorf("error updating availability for %q: %w", tour.ProductID, err)
 			}
 			a.logger.Debug("updated tour details", "tour_id", tour.ProductID, "changed", updated != nil)
 
 			if onUpdate != nil && updated != nil {
-				onUpdate(tour, *updated)
+				onUpdate(*tour, *updated)
 			}
 		}()
 	}
@@ -176,27 +177,35 @@ func (a *App) storeLatestAvailability(ctx context.Context, tour tours.TourDetail
 	return nil
 }
 
-func (a *App) Watch(ctx context.Context, interval time.Duration) error {
-	updateAvailabilities := func(t time.Time) error {
-		a.logger.Debug("updating availabilities")
-		err := a.UpdateLatestAvailabilities(ctx, func(tour tours.TourDetail, availability tours.AvailabilityDetail) {
-			if a.nc == nil {
-				return
-			}
-
-			err := a.nc.Send("New tour availabilities posted", fmt.Sprintf("Tour: %s\nDate: %s", tour.Name, availability.LocalDateTimeStart.Format(time.DateOnly)))
-			if err != nil {
-				a.logger.Error("error sending notification", "err", err)
-			}
-		})
-		if err != nil {
-			return fmt.Errorf("error updating availabilities: %w", err)
-		}
-		a.logger.Debug("finished updating availabilities", "duration", time.Since(t).String())
-		return nil
+func (a *App) updateAvailabilitiesForWatch(ctx context.Context, t time.Time) error {
+	allTours, err := a.sc.GetAll(ctx, url.Values{})
+	if err != nil {
+		return fmt.Errorf("error getting tours: %w", err)
 	}
 
-	err := updateAvailabilities(time.Now())
+	a.logger.Debug("updating availabilities")
+	err = a.UpdateLatestAvailabilities(ctx, allTours, func(tour tours.TourDetail, availability tours.AvailabilityDetail) {
+		if a.nc == nil {
+			return
+		}
+
+		err := a.nc.Send(
+			"New tour availabilities posted",
+			fmt.Sprintf("Tour: %s\nDate: %s", tour.Name, availability.LocalDateTimeStart.Format(time.DateOnly)),
+		)
+		if err != nil {
+			a.logger.Error("error sending notification", "err", err)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("error updating availabilities: %w", err)
+	}
+	a.logger.Debug("finished updating availabilities", "duration", time.Since(t).String())
+	return nil
+}
+
+func (a *App) Watch(ctx context.Context, interval time.Duration) error {
+	err := a.updateAvailabilitiesForWatch(ctx, time.Now())
 	if err != nil {
 		return err
 	}
@@ -219,7 +228,7 @@ func (a *App) Watch(ctx context.Context, interval time.Duration) error {
 	for {
 		select {
 		case t := <-ticker.C:
-			err := updateAvailabilities(t)
+			err := a.updateAvailabilitiesForWatch(ctx, t)
 			if err != nil {
 				return err
 			}
