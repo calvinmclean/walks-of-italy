@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -42,7 +43,18 @@ func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
 	go func() {
 		watchErr = a.Watch(ctx, watchInterval)
 	}()
-	err := a.api.WithContext(ctx).Serve()
+	err := a.api.
+		WithContext(ctx).
+		SetOnCreateOrUpdate(func(w http.ResponseWriter, r *http.Request, td *tours.TourDetail) *babyapi.ErrResponse {
+			updated, err := a.UpdateLatestAvailability(r.Context(), *td)
+			if err != nil {
+				a.logger.Error("error updating availability", "tour_id", td.ProductID, "err", err)
+				return nil
+			}
+			a.logger.Debug("updated tour details", "tour_id", td.ProductID, "changed", updated != nil)
+			return nil
+		}).
+		Serve()
 	return errors.Join(watchErr, err)
 }
 
