@@ -13,12 +13,15 @@ import (
 )
 
 const addLatestAvailability = `-- name: AddLatestAvailability :exec
-INSERT INTO latest_availabilities (
-    tour_uuid,
-    recorded_at,
-    availability_date,
-    raw_data
-) VALUES (?, CURRENT_TIMESTAMP, ?, ?)
+INSERT INTO
+    latest_availabilities (
+        tour_uuid,
+        recorded_at,
+        availability_date,
+        raw_data
+    )
+VALUES
+    (?, CURRENT_TIMESTAMP, ?, ?)
 `
 
 type AddLatestAvailabilityParams struct {
@@ -32,9 +35,81 @@ func (q *Queries) AddLatestAvailability(ctx context.Context, arg AddLatestAvaila
 	return err
 }
 
+const getAllLatestAvailabilities = `-- name: GetAllLatestAvailabilities :many
+SELECT
+    t.name,
+    t.url,
+    t.uuid,
+    la.recorded_at,
+    la.availability_date,
+    la.raw_data
+FROM
+    latest_availabilities la
+    JOIN tours t ON t.uuid = la.tour_uuid
+WHERE
+    la.recorded_at = (
+        SELECT
+            MAX(recorded_at)
+        FROM
+            latest_availabilities
+        WHERE
+            tour_uuid = t.uuid
+    )
+`
+
+type GetAllLatestAvailabilitiesRow struct {
+	Name             string
+	Url              string
+	Uuid             uuid.UUID
+	RecordedAt       time.Time
+	AvailabilityDate time.Time
+	RawData          string
+}
+
+func (q *Queries) GetAllLatestAvailabilities(ctx context.Context) ([]GetAllLatestAvailabilitiesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllLatestAvailabilities)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllLatestAvailabilitiesRow
+	for rows.Next() {
+		var i GetAllLatestAvailabilitiesRow
+		if err := rows.Scan(
+			&i.Name,
+			&i.Url,
+			&i.Uuid,
+			&i.RecordedAt,
+			&i.AvailabilityDate,
+			&i.RawData,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getLatestAvailability = `-- name: GetLatestAvailability :one
-SELECT tour_uuid, recorded_at, availability_date, raw_data FROM latest_availabilities
-WHERE tour_uuid = ? ORDER BY availability_date DESC LIMIT 1
+SELECT
+    tour_uuid,
+    recorded_at,
+    availability_date,
+    raw_data
+FROM
+    latest_availabilities
+WHERE
+    tour_uuid = ?
+ORDER BY
+    availability_date DESC
+LIMIT
+    1
 `
 
 func (q *Queries) GetLatestAvailability(ctx context.Context, tourUuid uuid.UUID) (LatestAvailability, error) {

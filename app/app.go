@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	"walks-of-italy/storage"
@@ -72,14 +72,15 @@ func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
 }
 
 func (a *App) SummarizeLatestAvailabilities(w http.ResponseWriter, r *http.Request) render.Renderer {
-	allTours, err := a.sc.GetAll(r.Context(), url.Values{})
+	availabilities, err := a.sc.GetAllLatestAvailabilities(r.Context())
 	if err != nil {
-		return babyapi.ErrInvalidRequest(fmt.Errorf("error getting tours: %w", err))
+		return babyapi.ErrInvalidRequest(fmt.Errorf("error getting availabilities: %w", err))
 	}
 
-	err = a.PrettySummary(r.Context(), w, allTours)
+	tmpl := template.Must(template.New("tour_availability").Parse(toursSummaryHTML))
+	err = tmpl.Execute(w, availabilities)
 	if err != nil {
-		return babyapi.ErrInvalidRequest(fmt.Errorf("error creating summary: %w", err))
+		return babyapi.ErrInvalidRequest(fmt.Errorf("error executing template: %w", err))
 	}
 
 	return nil
@@ -133,24 +134,15 @@ func (a *App) PrettySummary(ctx context.Context, w io.Writer, tours []*tours.Tou
 Tour Name                                                   | Available Date | Opened At
 ------------------------------------------------------------|----------------|----------------
 {{ range . -}}
-{{ truncate .TourName 59 }} | {{ .AvailabilityDate.Format "2006-01-02" }}     | {{ .RecordedAt.Format "2006-01-02 15:04:05" }}
+{{ truncate .Name 59 }} | {{ .AvailabilityDate.Format "2006-01-02" }}     | {{ .RecordedAt.Format "2006-01-02 15:04:05" }}
 {{ end }}`))
 
-	tourData := []map[string]any{}
-
-	for _, tour := range tours {
-		availability, err := a.sc.GetLatestAvailability(ctx, tour.ProductID)
-		if err != nil {
-			return fmt.Errorf("error getting availability for tour %q: %w", tour, err)
-		}
-
-		tourData = append(tourData, map[string]any{
-			"TourName":         tour.Name,
-			"AvailabilityDate": availability.AvailabilityDate,
-			"RecordedAt":       availability.RecordedAt,
-		})
+	availabilities, err := a.sc.GetAllLatestAvailabilities(ctx)
+	if err != nil {
+		return babyapi.ErrInvalidRequest(fmt.Errorf("error getting availabilities: %w", err))
 	}
-	return tmpl.Execute(w, tourData)
+
+	return tmpl.Execute(w, availabilities)
 }
 
 func (a *App) UpdateLatestAvailabilities(ctx context.Context, tours []*tours.TourDetail, onUpdate func(tours.TourDetail, tours.AvailabilityDetail)) error {
