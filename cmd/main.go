@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"log/slog"
@@ -17,7 +16,7 @@ import (
 
 func main() {
 	var debug bool
-	var dbFilename, pushoverAppToken, pushoverRecipientToken string
+	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr string
 	var watchInterval time.Duration
 	app := &cli.App{
 		Name: "walks-of-italy",
@@ -33,7 +32,7 @@ func main() {
 				Usage:       "filename for SQLite database",
 				Destination: &dbFilename,
 				EnvVars:     []string{"DB"},
-				Value:       ":memory:",
+				Value:       "file::memory:?cache=shared",
 			},
 			&cli.StringFlag{
 				Name:        "pushover-app-token",
@@ -63,24 +62,23 @@ func main() {
 				},
 				Description: "Watch for new tour availabilities",
 				Action: func(ctx *cli.Context) error {
-					return watch(ctx.Context, dbFilename, pushoverAppToken, pushoverRecipientToken, watchInterval, debug)
+					app, close, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
+					if err != nil {
+						return fmt.Errorf("error creating app: %w", err)
+					}
+					defer close()
+					return app.Watch(ctx.Context, watchInterval)
 				},
 			},
 			{
 				Name:        "update",
 				Description: "Update local data",
 				Action: func(ctx *cli.Context) error {
-					client, err := storage.New(dbFilename)
+					app, close, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
 					if err != nil {
-						return fmt.Errorf("error creating db client: %w", err)
+						return fmt.Errorf("error creating app: %w", err)
 					}
-					defer client.Close()
-
-					app := app.New(client, nil)
-
-					if debug {
-						slog.SetLogLoggerLevel(slog.LevelDebug)
-					}
+					defer close()
 
 					err = app.UpdateLatestAvailabilities(ctx.Context, nil)
 					if err != nil {
@@ -116,6 +114,35 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name: "serve",
+				Flags: []cli.Flag{
+					&cli.DurationFlag{
+						Name:        "interval",
+						Usage:       "Interval for polling new dates",
+						Destination: &watchInterval,
+						Value:       15 * time.Second,
+						EnvVars:     []string{"INTERVAL"},
+					},
+					&cli.StringFlag{
+						Name:        "addr",
+						Usage:       "address to serve on",
+						Destination: &addr,
+						Value:       ":7077",
+						EnvVars:     []string{"ADDR"},
+					},
+				},
+				Description: "Watch for new tour availabilities",
+				Action: func(ctx *cli.Context) error {
+					app, close, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
+					if err != nil {
+						return fmt.Errorf("error creating app: %w", err)
+					}
+					defer close()
+
+					return app.Run(ctx.Context, watchInterval)
+				},
+			},
 		},
 	}
 
@@ -125,31 +152,25 @@ func main() {
 	}
 }
 
-func watch(ctx context.Context, dbFilename, pushoverAppToken, pushoverRecipientToken string, interval time.Duration, debug bool) error {
+func setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken string, debug bool) (*app.App, func(), error) {
 	sc, err := storage.New(dbFilename)
 	if err != nil {
-		return fmt.Errorf("error creating db client: %w", err)
+		return nil, nil, fmt.Errorf("error creating db client: %w", err)
 	}
-	defer sc.Close()
 
 	var nc *app.NotifyClient
 	if pushoverAppToken != "" && pushoverRecipientToken != "" {
 		nc, err = app.NewNotifyClient(pushoverAppToken, pushoverRecipientToken)
 		if err != nil {
-			return fmt.Errorf("error creating notify client: %w", err)
+			return nil, nil, fmt.Errorf("error creating notify client: %w", err)
 		}
 	}
 
-	app := app.New(sc, nc)
+	app := app.New(addr, sc, nc)
 
 	if debug {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
 
-	err = app.Watch(ctx, interval)
-	if err != nil {
-		return fmt.Errorf("error watching: %w", err)
-	}
-
-	return nil
+	return app, sc.Close, nil
 }

@@ -6,11 +6,19 @@ package db
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type LatestAvailability struct {
-	TourUuid         interface{}
+	TourUuid         uuid.UUID
 	RecordedAt       time.Time
 	AvailabilityDate time.Time
 	RawData          string
+}
+
+type Tour struct {
+	Uuid uuid.UUID
+	Name string
+	Url  string
 }

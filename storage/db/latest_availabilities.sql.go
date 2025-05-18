@@ -8,6 +8,8 @@ package db
 import (
 	"context"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const addLatestAvailability = `-- name: AddLatestAvailability :exec
@@ -20,7 +22,7 @@ INSERT INTO latest_availabilities (
 `
 
 type AddLatestAvailabilityParams struct {
-	TourUuid         interface{}
+	TourUuid         uuid.UUID
 	AvailabilityDate time.Time
 	RawData          string
 }
@@ -35,7 +37,7 @@ SELECT tour_uuid, recorded_at, availability_date, raw_data FROM latest_availabil
 WHERE tour_uuid = ? ORDER BY availability_date DESC LIMIT 1
 `
 
-func (q *Queries) GetLatestAvailability(ctx context.Context, tourUuid interface{}) (LatestAvailability, error) {
+func (q *Queries) GetLatestAvailability(ctx context.Context, tourUuid uuid.UUID) (LatestAvailability, error) {
 	row := q.db.QueryRowContext(ctx, getLatestAvailability, tourUuid)
 	var i LatestAvailability
 	err := row.Scan(

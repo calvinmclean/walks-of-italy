@@ -4,3 +4,9 @@ CREATE TABLE IF NOT EXISTS latest_availabilities (
     availability_date DATETIME NOT NULL,
     raw_data TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS tours (
+    uuid UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL
+);

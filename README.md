@@ -13,3 +13,8 @@ curl 'https://api.ventrata.com/octo/availability' \
   -H 'Octo-Env: live' \
   -d '{"productId":"e9d2d819-5f04-4b1f-a07f-612387494b8f","optionId":"DEFAULT","localDateStart":"2025-09-01","localDateEnd":"2025-09-30","currency":"USD"}'
 ```
+
+
+```shell
+curl localhost:7077/tours -H "Content-Type: application/json" -X POST -d '{"Name": "VIP Vatican Key Master\'s Tour: Unlock the Sistine Chapel","URL": "https://www.walksofitaly.com/vatican-tours/key-masters-tour-sistine-chapel-vatican-museums/","ProductID": "e9d2d819-5f04-4b1f-a07f-612387494b8f"}'
+```

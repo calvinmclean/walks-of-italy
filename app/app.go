@@ -16,16 +16,33 @@ import (
 	"walks-of-italy/storage"
 	"walks-of-italy/storage/db"
 	"walks-of-italy/tours"
+
+	"github.com/calvinmclean/babyapi"
 )
 
 type App struct {
 	sc     *storage.Client
 	nc     *NotifyClient
+	api    *babyapi.API[*tours.TourDetail]
 	logger slog.Logger
 }
 
-func New(sc *storage.Client, nc *NotifyClient) *App {
-	return &App{sc: sc, nc: nc, logger: *slog.Default()}
+func New(addr string, sc *storage.Client, nc *NotifyClient) *App {
+	api := babyapi.
+		NewAPI("Tours", "/tours", func() *tours.TourDetail { return &tours.TourDetail{} }).
+		SetAddress(addr).
+		SetStorage(sc)
+
+	return &App{sc: sc, nc: nc, api: api, logger: *slog.Default()}
+}
+
+func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
+	var watchErr error
+	go func() {
+		watchErr = a.Watch(ctx, watchInterval)
+	}()
+	err := a.api.WithContext(ctx).Serve()
+	return errors.Join(watchErr, err)
 }
 
 func (a *App) LogSummary(ctx context.Context) error {

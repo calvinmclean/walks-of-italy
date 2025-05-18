@@ -7,3 +7,6 @@ sql:
       go:
         package: "db"
         out: "db"
+        overrides:
+          - db_type: "UUID"
+            go_type: "github.com/google/uuid.UUID"

@@ -61,6 +61,18 @@ type TourDetail struct {
 	ProductID uuid.UUID
 }
 
+func (td TourDetail) GetID() string {
+	return td.ProductID.String()
+}
+
+func (td *TourDetail) Bind(r *http.Request) error {
+	return nil
+}
+
+func (*TourDetail) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
 func (ar AvailabilityRequest) JSON() io.Reader {
 	var r bytes.Buffer
 	_ = json.NewEncoder(&r).Encode(ar)
