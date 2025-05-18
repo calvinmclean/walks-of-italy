@@ -18,7 +18,7 @@ import (
 
 func main() {
 	var debug bool
-	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr string
+	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr, accessToken string
 	var watchInterval time.Duration
 	app := &cli.App{
 		Name: "walks-of-italy",
@@ -48,6 +48,12 @@ func main() {
 				Destination: &pushoverRecipientToken,
 				EnvVars:     []string{"PUSHOVER_RECIPIENT_TOKEN"},
 			},
+			&cli.StringFlag{
+				Name:        "access-token",
+				Usage:       "Access token for Walks of Italy API",
+				Destination: &accessToken,
+				EnvVars:     []string{"ACCESS_TOKEN"},
+			},
 		},
 		DefaultCommand: "watch",
 		Commands: []*cli.Command{
@@ -64,7 +70,7 @@ func main() {
 				},
 				Description: "Watch for new tour availabilities",
 				Action: func(ctx *cli.Context) error {
-					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}
@@ -76,7 +82,7 @@ func main() {
 				Name:        "update",
 				Description: "Update local data",
 				Action: func(ctx *cli.Context) error {
-					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}
@@ -112,7 +118,7 @@ func main() {
 
 					start := tours.DateFromTime(time.Now())
 					end := start.Add(1, 0, 0)
-					availability, err := tour.FindAvailability(ctx.Context, start, end, func(a tours.AvailabilityDetail) bool {
+					availability, err := tour.FindAvailability(ctx.Context, accessToken, start, end, func(a tours.AvailabilityDetail) bool {
 						return a.Vacancies >= 7
 					})
 					if err != nil {
@@ -147,7 +153,7 @@ func main() {
 				},
 				Description: "Watch for new tour availabilities",
 				Action: func(ctx *cli.Context) error {
-					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}
@@ -165,7 +171,7 @@ func main() {
 	}
 }
 
-func setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken string, debug bool) (*app.App, *storage.Client, error) {
+func setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken string, debug bool) (*app.App, *storage.Client, error) {
 	sc, err := storage.New(dbFilename)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating db client: %w", err)
@@ -179,7 +185,7 @@ func setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken string,
 		}
 	}
 
-	app := app.New(addr, sc, nc)
+	app := app.New(addr, accessToken, sc, nc)
 
 	if debug {
 		slog.SetLogLoggerLevel(slog.LevelDebug)

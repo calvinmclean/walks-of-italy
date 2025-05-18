@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	accessToken     = "b082247d-90d9-4e44-8623-3a8a4b5c14de"
 	availabilityURL = "https://api.ventrata.com/octo/availability"
 )
 
@@ -43,7 +42,7 @@ func (ar AvailabilityRequest) JSON() io.Reader {
 	return &r
 }
 
-func (td TourDetail) GetAvailability(ctx context.Context, start, end Date) (Availabilities, error) {
+func (td TourDetail) GetAvailability(ctx context.Context, accessToken string, start, end Date) (Availabilities, error) {
 	requestBody := NewAvailabilityRequest(td.ProductID, start, end)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, availabilityURL, requestBody.JSON())
 	if err != nil {
@@ -75,6 +74,10 @@ func (td TourDetail) GetAvailability(ctx context.Context, start, end Date) (Avai
 		return Availabilities{}, fmt.Errorf("error reading response: %w", err)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return Availabilities{}, fmt.Errorf("unexpected response code: %d, body: %q", resp.StatusCode, string(body))
+	}
+
 	var result Availabilities
 	err = json.Unmarshal(body, &result)
 	if err != nil {
@@ -86,12 +89,12 @@ func (td TourDetail) GetAvailability(ctx context.Context, start, end Date) (Avai
 
 // availabilityFilter allows filtering available dates by criteria like price and number of tickets.
 // The filter should return "true" if the date is considered to be available.
-func (td TourDetail) FindAvailability(ctx context.Context, start, end Date, availabilityFilter func(AvailabilityDetail) bool) (Availabilities, error) {
+func (td TourDetail) FindAvailability(ctx context.Context, accessToken string, start, end Date, availabilityFilter func(AvailabilityDetail) bool) (Availabilities, error) {
 	if availabilityFilter == nil {
 		return nil, errors.New("missing availabilityFilter")
 	}
 
-	availability, err := td.GetAvailability(ctx, start, end)
+	availability, err := td.GetAvailability(ctx, accessToken, start, end)
 	if err != nil {
 		return nil, fmt.Errorf("error getting availability: %w", err)
 	}
@@ -106,11 +109,11 @@ func (td TourDetail) FindAvailability(ctx context.Context, start, end Date, avai
 	return result, nil
 }
 
-func (td TourDetail) GetLatestAvailability(ctx context.Context) (AvailabilityDetail, error) {
+func (td TourDetail) GetLatestAvailability(ctx context.Context, accessToken string) (AvailabilityDetail, error) {
 	start := DateFromTime(time.Now())
 	end := start.Add(1, 0, 0)
 
-	availability, err := td.GetAvailability(ctx, start, end)
+	availability, err := td.GetAvailability(ctx, accessToken, start, end)
 	if err != nil {
 		return AvailabilityDetail{}, fmt.Errorf("error getting availability: %w", err)
 	}

@@ -23,25 +23,31 @@ import (
 )
 
 type App struct {
-	sc     *storage.Client
-	nc     *NotifyClient
-	api    *babyapi.API[*tours.TourDetail]
-	logger slog.Logger
+	sc          *storage.Client
+	nc          *NotifyClient
+	api         *babyapi.API[*tours.TourDetail]
+	accessToken string
+	logger      slog.Logger
 }
 
-func New(addr string, sc *storage.Client, nc *NotifyClient) *App {
+func New(addr string, accessToken string, sc *storage.Client, nc *NotifyClient) *App {
 	api := babyapi.
 		NewAPI("Tours", "/tours", func() *tours.TourDetail { return &tours.TourDetail{} }).
 		SetAddress(addr).
 		SetStorage(sc)
 
-	return &App{sc: sc, nc: nc, api: api, logger: *slog.Default()}
+	return &App{sc: sc, nc: nc, api: api, accessToken: accessToken, logger: *slog.Default()}
 }
 
 func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
+	ctx, cancel := context.WithCancel(ctx)
+
 	var watchErr error
 	go func() {
 		watchErr = a.Watch(ctx, watchInterval)
+		if watchErr != nil {
+			cancel()
+		}
 	}()
 	err := a.api.
 		WithContext(ctx).
@@ -55,6 +61,9 @@ func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
 			return nil
 		}).
 		Serve()
+	if err != nil {
+		cancel()
+	}
 	return errors.Join(watchErr, err)
 }
 
@@ -141,7 +150,7 @@ func (a *App) UpdateLatestAvailabilities(ctx context.Context, tours []*tours.Tou
 }
 
 func (a *App) UpdateLatestAvailability(ctx context.Context, tour tours.TourDetail) (*tours.AvailabilityDetail, error) {
-	availability, err := tour.GetLatestAvailability(ctx)
+	availability, err := tour.GetLatestAvailability(ctx, a.accessToken)
 	if err != nil {
 		return nil, fmt.Errorf("error getting availability: %w", err)
 	}
@@ -219,7 +228,7 @@ func (a *App) updateAvailabilitiesForWatch(ctx context.Context, t time.Time) err
 func (a *App) Watch(ctx context.Context, interval time.Duration) error {
 	err := a.updateAvailabilitiesForWatch(ctx, time.Now())
 	if err != nil {
-		return err
+		a.logger.Error("error updating availabilities", "err", err)
 	}
 
 	now := time.Now()
@@ -242,7 +251,7 @@ func (a *App) Watch(ctx context.Context, interval time.Duration) error {
 		case t := <-ticker.C:
 			err := a.updateAvailabilitiesForWatch(ctx, t)
 			if err != nil {
-				return err
+				a.logger.Error("error updating availabilities", "err", err)
 			}
 		case <-ctx.Done():
 			return ctx.Err()
