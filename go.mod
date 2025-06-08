@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/calvinmclean/babyapi v0.25.0
+	github.com/go-chi/render v1.0.3
 	github.com/google/uuid v1.6.0
 	github.com/gregdel/pushover v1.3.1
 	github.com/mattn/go-sqlite3 v1.14.28
@@ -15,7 +16,6 @@ require (
 	github.com/ajg/form v1.5.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/go-chi/chi/v5 v5.0.10 // indirect
-	github.com/go-chi/render v1.0.3 // indirect
 	github.com/gomodule/redigo v1.9.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/rs/xid v1.5.0 // indirect

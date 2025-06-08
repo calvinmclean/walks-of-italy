@@ -40,7 +40,9 @@ func New(filename string) (*Client, error) {
 	ddlQueries := strings.Split(ddl, "\n\n")
 	for _, q := range ddlQueries {
 		_, err = database.Exec(q)
-		if err != nil && !strings.Contains(err.Error(), "duplicate column name:") {
+		if err != nil &&
+			!strings.Contains(err.Error(), "duplicate column name:") && // allow "idempotent" migration
+			!strings.Contains(err.Error(), "no such column:") {
 			return nil, fmt.Errorf("error creating tables: %w", err)
 		}
 	}

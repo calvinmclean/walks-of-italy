@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
@@ -101,6 +102,35 @@ func main() {
 					err = app.PrettySummary(ctx.Context, os.Stdout, allTours)
 					if err != nil {
 						return fmt.Errorf("error getting summary: %w", err)
+					}
+
+					return nil
+				},
+			},
+			{
+				Name:        "details",
+				Description: "print details from details API",
+				Action: func(ctx *cli.Context) error {
+					sc, err := storage.New(dbFilename)
+					if err != nil {
+						return fmt.Errorf("error creating db client: %w", err)
+					}
+					defer sc.Close()
+
+					allTours, err := sc.GetAll(ctx.Context, url.Values{})
+					if err != nil {
+						return fmt.Errorf("error getting tours: %w", err)
+					}
+
+					for _, td := range allTours {
+						desc, err := td.GetDescription(context.Background(), td.ApiUrl)
+						if err != nil {
+							return fmt.Errorf("error getting description for %q: %w", td.Name, err)
+						}
+
+						fmt.Println(td.Name)
+						fmt.Println(string(desc))
+						fmt.Println()
 					}
 
 					return nil
