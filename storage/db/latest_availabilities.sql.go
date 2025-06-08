@@ -38,7 +38,8 @@ func (q *Queries) AddLatestAvailability(ctx context.Context, arg AddLatestAvaila
 const getAllLatestAvailabilities = `-- name: GetAllLatestAvailabilities :many
 SELECT
     t.name,
-    t.url,
+    t.link,
+    t.api_url,
     t.uuid,
     la.recorded_at,
     la.availability_date,
@@ -59,7 +60,8 @@ WHERE
 
 type GetAllLatestAvailabilitiesRow struct {
 	Name             string
-	Url              string
+	Link             string
+	ApiUrl           string
 	Uuid             uuid.UUID
 	RecordedAt       time.Time
 	AvailabilityDate time.Time
@@ -77,7 +79,8 @@ func (q *Queries) GetAllLatestAvailabilities(ctx context.Context) ([]GetAllLates
 		var i GetAllLatestAvailabilitiesRow
 		if err := rows.Scan(
 			&i.Name,
-			&i.Url,
+			&i.Link,
+			&i.ApiUrl,
 			&i.Uuid,
 			&i.RecordedAt,
 			&i.AvailabilityDate,

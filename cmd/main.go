@@ -112,7 +112,7 @@ func main() {
 				Action: func(ctx *cli.Context) error {
 					tour := tours.TourDetail{
 						Name:      "VIP Vatican Key Master's Tour: Unlock the Sistine Chapel",
-						URL:       "https://www.walksofitaly.com/vatican-tours/key-masters-tour-sistine-chapel-vatican-museums/",
+						Link:      "https://www.walksofitaly.com/vatican-tours/key-masters-tour-sistine-chapel-vatican-museums/",
 						ProductID: uuid.MustParse("e9d2d819-5f04-4b1f-a07f-612387494b8f"),
 					}
 

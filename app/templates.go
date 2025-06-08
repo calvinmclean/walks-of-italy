@@ -19,7 +19,7 @@ const toursSummaryHTML = `<!doctype html>
             <div
                 class="uk-card uk-card-default uk-card-body uk-margin-auto"
             >
-                <h3 class="uk-card-title"><a href={{ .Url }}>{{ .Name }}</a></h3>
+                <h3 class="uk-card-title"><a href={{ .Link }}>{{ .Name }}</a></h3>
                 <p class="uk-text-meta">{{ .Uuid }}</p>
                 <ul class="uk-list uk-list-divider">
                     <li>

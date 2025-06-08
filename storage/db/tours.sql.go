@@ -12,7 +12,9 @@ import (
 )
 
 const deleteTour = `-- name: DeleteTour :exec
-DELETE FROM tours WHERE uuid = ?
+DELETE FROM tours
+WHERE
+    uuid = ?
 `
 
 func (q *Queries) DeleteTour(ctx context.Context, argUuid uuid.UUID) error {
@@ -21,19 +23,33 @@ func (q *Queries) DeleteTour(ctx context.Context, argUuid uuid.UUID) error {
 }
 
 const getTour = `-- name: GetTour :one
-SELECT uuid, name, url FROM tours
-WHERE uuid = ? LIMIT 1
+SELECT
+    uuid, name, link, api_url
+FROM
+    tours
+WHERE
+    uuid = ?
+LIMIT
+    1
 `
 
 func (q *Queries) GetTour(ctx context.Context, argUuid uuid.UUID) (Tour, error) {
 	row := q.db.QueryRowContext(ctx, getTour, argUuid)
 	var i Tour
-	err := row.Scan(&i.Uuid, &i.Name, &i.Url)
+	err := row.Scan(
+		&i.Uuid,
+		&i.Name,
+		&i.Link,
+		&i.ApiUrl,
+	)
 	return i, err
 }
 
 const listTours = `-- name: ListTours :many
-SELECT uuid, name, url FROM tours
+SELECT
+    uuid, name, link, api_url
+FROM
+    tours
 `
 
 func (q *Queries) ListTours(ctx context.Context) ([]Tour, error) {
@@ -45,7 +61,12 @@ func (q *Queries) ListTours(ctx context.Context) ([]Tour, error) {
 	var items []Tour
 	for rows.Next() {
 		var i Tour
-		if err := rows.Scan(&i.Uuid, &i.Name, &i.Url); err != nil {
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Name,
+			&i.Link,
+			&i.ApiUrl,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -60,23 +81,30 @@ func (q *Queries) ListTours(ctx context.Context) ([]Tour, error) {
 }
 
 const upsertTour = `-- name: UpsertTour :exec
-INSERT INTO tours (
-  uuid, name, url
-) VALUES (
-  ?, ?, ?
-) ON CONFLICT (uuid)
-DO UPDATE SET
-  name = EXCLUDED.name,
-  url = EXCLUDED.url
+INSERT INTO
+    tours (uuid, name, link, api_url)
+VALUES
+    (?, ?, ?, ?) ON CONFLICT (uuid) DO
+UPDATE
+SET
+    name = EXCLUDED.name,
+    link = EXCLUDED.link,
+    api_url = EXCLUDED.api_url
 `
 
 type UpsertTourParams struct {
-	Uuid uuid.UUID
-	Name string
-	Url  string
+	Uuid   uuid.UUID
+	Name   string
+	Link   string
+	ApiUrl string
 }
 
 func (q *Queries) UpsertTour(ctx context.Context, arg UpsertTourParams) error {
-	_, err := q.db.ExecContext(ctx, upsertTour, arg.Uuid, arg.Name, arg.Url)
+	_, err := q.db.ExecContext(ctx, upsertTour,
+		arg.Uuid,
+		arg.Name,
+		arg.Link,
+		arg.ApiUrl,
+	)
 	return err
 }

@@ -16,7 +16,8 @@ LIMIT
 -- name: GetAllLatestAvailabilities :many
 SELECT
     t.name,
-    t.url,
+    t.link,
+    t.api_url,
     t.uuid,
     la.recorded_at,
     la.availability_date,

@@ -1,14 +1,63 @@
 package tours
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+func (td TourDetail) GetAvailability(ctx context.Context, accessToken string, start, end Date) (Availabilities, error) {
+	requestBody := NewAvailabilityRequest(td.ProductID, start, end)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, availabilityURL, requestBody.JSON())
+	if err != nil {
+		return Availabilities{}, fmt.Errorf("error creating request: %w", err)
+	}
+
+	capabilities := []string{
+		"octo/content",
+		"octo/pricing",
+		// "octo/pickups",
+		// "octo/extras",
+		"octo/offers",
+		"octo/resources",
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Octo-Capabilities", strings.Join(capabilities, ","))
+	req.Header.Set("Octo-Env", "live")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return Availabilities{}, fmt.Errorf("error executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Availabilities{}, fmt.Errorf("error reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return Availabilities{}, fmt.Errorf("unexpected response code: %d, body: %q", resp.StatusCode, string(body))
+	}
+
+	var result Availabilities
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return Availabilities{}, fmt.Errorf("error parsing response: %w", err)
+	}
+
+	return result, nil
+}
 
 type AvailabilityRequest struct {
 	ProductID      uuid.UUID `json:"productId"`
@@ -26,6 +75,12 @@ func NewAvailabilityRequest(productID uuid.UUID, start, end Date) AvailabilityRe
 		LocalDateEnd:   end,
 		Currency:       "USD",
 	}
+}
+
+func (ar AvailabilityRequest) JSON() io.Reader {
+	var r bytes.Buffer
+	_ = json.NewEncoder(&r).Encode(ar)
+	return &r
 }
 
 type Availabilities []AvailabilityDetail

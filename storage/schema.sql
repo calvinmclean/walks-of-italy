@@ -11,3 +11,11 @@ CREATE TABLE IF NOT EXISTS latest_availabilities (
     raw_data TEXT NOT NULL,
     FOREIGN KEY (tour_uuid) REFERENCES tours (uuid)
 );
+
+-- add new column to track the API URL
+ALTER TABLE tours
+ADD COLUMN api_url TEXT NOT NULL DEFAULT '';
+
+-- rename url to link since it is a link to the site, but not used by the application
+ALTER TABLE tours
+RENAME COLUMN url TO link;

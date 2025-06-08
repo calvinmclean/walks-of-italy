@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"walks-of-italy/storage/db"
 	"walks-of-italy/tours"
@@ -36,9 +37,12 @@ func New(filename string) (*Client, error) {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
 
-	_, err = database.Exec(ddl)
-	if err != nil {
-		return nil, fmt.Errorf("error creating tables: %w", err)
+	ddlQueries := strings.Split(ddl, "\n\n")
+	for _, q := range ddlQueries {
+		_, err = database.Exec(q)
+		if err != nil && !strings.Contains(err.Error(), "duplicate column name:") {
+			return nil, fmt.Errorf("error creating tables: %w", err)
+		}
 	}
 
 	return &Client{
@@ -54,7 +58,8 @@ func (c Client) Close() {
 func fromDB(tour db.Tour) *tours.TourDetail {
 	return &tours.TourDetail{
 		Name:      tour.Name,
-		URL:       tour.Url,
+		Link:      tour.Link,
+		ApiUrl:    tour.ApiUrl,
 		ProductID: tour.Uuid,
 	}
 }
@@ -88,9 +93,10 @@ func (c Client) GetAll(ctx context.Context, query url.Values) ([]*tours.TourDeta
 
 func (c Client) Set(ctx context.Context, tour *tours.TourDetail) error {
 	return c.Queries.UpsertTour(ctx, db.UpsertTourParams{
-		Uuid: tour.ProductID,
-		Name: tour.Name,
-		Url:  tour.URL,
+		Uuid:   tour.ProductID,
+		Name:   tour.Name,
+		Link:   tour.Link,
+		ApiUrl: tour.ApiUrl,
 	})
 }
 

@@ -18,7 +18,8 @@ type LatestAvailability struct {
 }
 
 type Tour struct {
-	Uuid uuid.UUID
-	Name string
-	Url  string
+	Uuid   uuid.UUID
+	Name   string
+	Link   string
+	ApiUrl string
 }
