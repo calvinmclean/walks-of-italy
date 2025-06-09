@@ -166,16 +166,16 @@ func (t Tools) Tools() api.Tools {
 			Function: api.ToolFunction{
 				Name:        "getTourDetails",
 				Description: "Get more specific details about a tour",
-				Parameters: api.ToolFunctionParameters{
+				Parameters: ToolFunctionParameters{
 					Type:     "object",
 					Required: []string{"tour_id"},
-					Properties: map[string]api.ToolFunctionProperty{
+					Properties: ToolFunctionProperties{
 						"tour_id": {
 							Type:        api.PropertyType{"string"},
 							Description: "The UUID for identifying a tour",
 						},
 					},
-				},
+				}.ToAPI(),
 			},
 		},
 		{
@@ -183,10 +183,10 @@ func (t Tools) Tools() api.Tools {
 			Function: api.ToolFunction{
 				Name:        "getTourAvailability",
 				Description: "Get a tour's availability for certain dates",
-				Parameters: api.ToolFunctionParameters{
+				Parameters: ToolFunctionParameters{
 					Type:     "object",
 					Required: []string{"tour_id", "start", "end"},
-					Properties: map[string]api.ToolFunctionProperty{
+					Properties: ToolFunctionProperties{
 						"tour_id": {
 							Type:        api.PropertyType{"string"},
 							Description: "The UUID for identifying a tour",
@@ -200,8 +200,77 @@ func (t Tools) Tools() api.Tools {
 							Description: "The date to start the end in format 2006-01-02",
 						},
 					},
-				},
+				}.ToAPI(),
 			},
 		},
 	}
+}
+
+type ToolFunctionParameters struct {
+	Type       string                 `json:"type"`
+	Defs       any                    `json:"$defs,omitempty"`
+	Items      any                    `json:"items,omitempty"`
+	Required   []string               `json:"required"`
+	Properties ToolFunctionProperties `json:"properties"`
+}
+
+func (t ToolFunctionParameters) ToAPI() struct {
+	Type       string   `json:"type"`
+	Defs       any      `json:"$defs,omitempty"`
+	Items      any      `json:"items,omitempty"`
+	Required   []string `json:"required"`
+	Properties map[string]struct {
+		Type        api.PropertyType `json:"type"`
+		Items       any              `json:"items,omitempty"`
+		Description string           `json:"description"`
+		Enum        []any            `json:"enum,omitempty"`
+	} `json:"properties"`
+} {
+	return struct {
+		Type       string   `json:"type"`
+		Defs       any      `json:"$defs,omitempty"`
+		Items      any      `json:"items,omitempty"`
+		Required   []string `json:"required"`
+		Properties map[string]struct {
+			Type        api.PropertyType `json:"type"`
+			Items       any              `json:"items,omitempty"`
+			Description string           `json:"description"`
+			Enum        []any            `json:"enum,omitempty"`
+		} `json:"properties"`
+	}{
+		Type:       t.Type,
+		Defs:       t.Defs,
+		Items:      t.Items,
+		Required:   t.Required,
+		Properties: t.Properties.ToAPI(),
+	}
+}
+
+type ToolFunctionProperties map[string]ToolFunctionProperty
+
+type ToolFunctionProperty struct {
+	Type        api.PropertyType `json:"type"`
+	Items       any              `json:"items,omitempty"`
+	Description string           `json:"description"`
+	Enum        []any            `json:"enum,omitempty"`
+}
+
+func (t ToolFunctionProperties) ToAPI() map[string]struct {
+	Type        api.PropertyType `json:"type"`
+	Items       any              `json:"items,omitempty"`
+	Description string           `json:"description"`
+	Enum        []any            `json:"enum,omitempty"`
+} {
+	result := map[string]struct {
+		Type        api.PropertyType `json:"type"`
+		Items       any              `json:"items,omitempty"`
+		Description string           `json:"description"`
+		Enum        []any            `json:"enum,omitempty"`
+	}{}
+
+	for key, val := range t {
+		result[key] = val
+	}
+
+	return result
 }

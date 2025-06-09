@@ -2,9 +2,6 @@ module walks-of-italy
 
 go 1.24.0
 
-// I am currently using a forked version with this change: https://github.com/ollama/ollama/pull/11013
-replace github.com/ollama/ollama => ../ollama
-
 require (
 	github.com/calvinmclean/babyapi v0.25.0
 	github.com/go-chi/render v1.0.3
