@@ -3,7 +3,7 @@ RUN mkdir /build
 ADD . /build
 WORKDIR /build
 ENV CGO_ENABLED=1
-RUN go build -o walks-of-italy ./cmd/main.go
+RUN go build -o walks-of-italy ./cmd/walks-of-italy/main.go
 
 FROM debian:bullseye-slim AS production
 
