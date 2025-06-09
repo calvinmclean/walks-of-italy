@@ -21,8 +21,8 @@ type Tools struct {
 	cache       map[string]string
 }
 
-func New(sc *storage.Client, accessToken string) Tools {
-	return Tools{sc: sc, accessToken: accessToken, logger: *slog.Default(), cache: map[string]string{}}
+func New(sc *storage.Client, accessToken string, logger slog.Logger) Tools {
+	return Tools{sc: sc, accessToken: accessToken, logger: logger, cache: map[string]string{}}
 }
 
 func executeToolFunction[T interface{ CacheKey() string }](cache map[string]string, args map[string]any, runTool func(T) (string, error)) (string, error) {
@@ -53,13 +53,13 @@ func executeToolFunction[T interface{ CacheKey() string }](cache map[string]stri
 }
 
 func (t Tools) Execute(name string, args map[string]any) (output string, _ error) {
-	t.logger.With("name", name, "args", args).Info("tool call")
+	t.logger.With("name", name, "args", args).Debug("tool call")
 
 	defer func(out *string) {
 		if out == nil {
 			return
 		}
-		t.logger.With("name", name, "args", args, "output", *out).Info("tool call done")
+		t.logger.With("name", name, "args", args, "output", *out).Debug("tool call done")
 	}(&output)
 
 	switch name {
