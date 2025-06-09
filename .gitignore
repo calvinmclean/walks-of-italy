@@ -1,1 +1,3 @@
-test.db
+*.db
+vendor/
+notes.md
