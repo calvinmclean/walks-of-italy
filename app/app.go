@@ -27,6 +27,7 @@ type App struct {
 	sc          *storage.Client
 	nc          *NotifyClient
 	api         *babyapi.API[*tours.TourDetail]
+	addr        string
 	accessToken string
 	logger      slog.Logger
 }
@@ -34,10 +35,9 @@ type App struct {
 func New(addr string, accessToken string, sc *storage.Client, nc *NotifyClient) *App {
 	api := babyapi.
 		NewAPI("Tours", "/tours", func() *tours.TourDetail { return &tours.TourDetail{} }).
-		SetAddress(addr).
 		SetStorage(sc)
 
-	return &App{sc: sc, nc: nc, api: api, accessToken: accessToken, logger: *slog.Default()}
+	return &App{sc: sc, nc: nc, api: api, addr: addr, accessToken: accessToken, logger: *slog.Default()}
 }
 
 func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
@@ -50,7 +50,8 @@ func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
 			cancel()
 		}
 	}()
-	err := a.api.
+
+	api := a.api.
 		WithContext(ctx).
 		SetOnCreateOrUpdate(func(w http.ResponseWriter, r *http.Request, td *tours.TourDetail) *babyapi.ErrResponse {
 			updated, err := a.UpdateLatestAvailability(r.Context(), *td)
@@ -62,9 +63,15 @@ func (a *App) Run(ctx context.Context, watchInterval time.Duration) error {
 			return nil
 		}).
 		AddCustomRoute(http.MethodGet, "/summary", babyapi.Handler(a.SummarizeLatestAvailabilities)).
-		AddCustomIDRoute(http.MethodGet, "/summary", a.api.GetRequestedResourceAndDo(a.SummarizeTourDates)).
-		Serve()
+		AddCustomIDRoute(http.MethodGet, "/summary", a.api.GetRequestedResourceAndDo(a.SummarizeTourDates))
 
+	// setup root API to redirect from /
+	rootAPI := babyapi.NewRootAPI("walks-of-italy", "/").
+		SetAddress(a.addr).
+		AddCustomRoute(http.MethodGet, "/", http.RedirectHandler("/tours/summary", http.StatusFound)).
+		AddNestedAPI(api)
+
+	err := rootAPI.Serve()
 	if err != nil {
 		cancel()
 	}

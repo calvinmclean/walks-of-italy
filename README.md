@@ -1,27 +1,64 @@
-Goals:
-  - Alert when tours open up on specific dates
-  - Learn how far in the future each tour opens up (generally)
-  - See when new dates are dropped and how many drop at once
+# Walks of Italy
 
-Example `curl`:
+This application allows tracking tours provided by [Walks of Italy](https://www.walksofitaly.com).
+
+You can use the functions provided here to check specific date ranges for a tour's availability or run the server to get alerted when new tour dates are published.
+
+Additionally, you can use the integrated AI tools and chat command with local Ollama models to interact with tour descriptions and availability.
+
+## How To
+
+This application uses the Ventrata API for Walks of Italy tours. It requires an access token to get this data. You can get this token by accessing a tour page and searching `api.ventrata.com/octo/availability` in the Network tab of developer console. The token is shown in the `Authorization` header of requests.
+
+Now that you have a token, you can use the CLI:
+
 ```shell
-curl 'https://api.ventrata.com/octo/availability' \
-  -X 'POST' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <token>' \
-  -H 'Octo-Capabilities: octo/content,octo/pricing,octo/pickups,octo/extras,octo/offers,octo/resources' \
-  -H 'Octo-Env: live' \
-  -d '{"productId":"e9d2d819-5f04-4b1f-a07f-612387494b8f","optionId":"DEFAULT","localDateStart":"2025-09-01","localDateEnd":"2025-09-30","currency":"USD"}'
+export ACCESS_TOKEN=token
+
+go run cmd/walks-of-italy/main.go \
+  search \
+  --tour-id e9d2d819-5f04-4b1f-a07f-612387494b8f \
+  --start 2025-11-15 --end 2025-12-20
 ```
 
+### Load Data
+
+You can load a few example tours into the DB with this command:
+
 ```shell
-curl localhost:7077/tours -H "Content-Type: application/json" -X POST -d '{"Name": "VIP Vatican Key Master\'s Tour: Unlock the Sistine Chapel","URL": "https://www.walksofitaly.com/vatican-tours/key-masters-tour-sistine-chapel-vatican-museums/","ProductID": "e9d2d819-5f04-4b1f-a07f-612387494b8f"}'
+go run cmd/walks-of-italy/main.go \
+  --db walks-of-italy.db \
+  load \
+  --data example-data.json
+```
 
-curl localhost:7077/tours -H "Content-Type: application/json" -X POST -d '{"Name": "Private Vatican Tour: Vatican Museums, Sistine Chapel & St. Peter\'s","URL": "https://www.walksofitaly.com/vatican-tours/private-vatican-tour/","ProductID": "c40d8e0e-6756-463b-a052-982c77a707aa"}'
+Or, once the server is running, use the API to insert:
 
-curl localhost:7077/tours -H "Content-Type: application/json" -X POST -d '{"Name": "The Complete Vatican Tour with Vatican Museums, Sistine Chapel & St. Peter\'s Basilica","URL": "https://www.walksofitaly.com/vatican-tours/complete-vatican-tour/","ProductID": "3b263ef8-c280-49cc-a74f-ac95aa2f1b58"}'
+```shell
+curl localhost:7077/tours -H "Content-Type: application/json" -X POST -d '{"Name": "VIP Vatican Key Master\'s Tour: Unlock the Sistine Chapel","Link": "https://www.walksofitaly.com/vatican-tours/key-masters-tour-sistine-chapel-vatican-museums/","ProductID": "e9d2d819-5f04-4b1f-a07f-612387494b8f", "ApiUrl": "https://tour-api.walks.org/sites/walksofitaly/tour/key-masters-tour-sistine-chapel-vatican-museums"}'
+```
 
-curl localhost:7077/tours -H "Content-Type: application/json" -X POST -d '{"Name": "Alone in the Sistine Chapel: VIP Entry at the Vatican\'s Most Exclusive Hours","URL": "https://www.walksofitaly.com/vatican-tours/vatican-after-hours-tour/","ProductID": "8c14824f-905d-4273-8b83-10b567db6e55"}'
+### Run Server
 
-curl localhost:7077/tours -H "Content-Type: application/json" -X POST -d '{"Name": "Pristine Sistine Early Entrance Small Group Vatican Tour","URL": "https://www.walksofitaly.com/vatican-tours/pristine-sistine-chapel-tour/","ProductID": "a1249220-e5d8-4983-93b2-c31ddfb3ccb8"}'
+```shell
+export ACCESS_TOKEN=token
+
+go run cmd/walks-of-italy/main.go \
+  --db walks-of-italy.db \
+  serve
+```
+
+Then, visit http://localhost:7077 to see the UI!
+
+### Use AI Chat
+
+With Ollama running locally, you can chat about the tours you have in the DB:
+
+```shell
+export ACCESS_TOKEN=token
+
+go run cmd/walks-of-italy/main.go \
+  --db server-backup.db \
+  chat \
+  --model qwen2.5:7b
 ```

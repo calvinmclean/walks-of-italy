@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
@@ -9,19 +10,20 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/urfave/cli/v2"
-
 	"walks-of-italy/ai"
 	"walks-of-italy/app"
 	"walks-of-italy/storage"
 	"walks-of-italy/tours"
+
+	"github.com/google/uuid"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
 	var debug bool
-	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr, accessToken, model string
+	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr, accessToken, model, dataFile, tourID string
 	var watchInterval time.Duration
+	var searchStart, searchEnd cli.Timestamp
 	app := &cli.App{
 		Name: "walks-of-italy",
 		Flags: []cli.Flag{
@@ -37,13 +39,7 @@ func main() {
 				Destination: &dbFilename,
 				EnvVars:     []string{"DB"},
 				Value:       "file::memory:?cache=shared",
-			},
-			&cli.StringFlag{
-				Name:        "model",
-				Usage:       "model name to interact with in Ollama",
-				Destination: &model,
-				EnvVars:     []string{"MODEL"},
-				Value:       "qwen2.5:7b",
+				TakesFile:   true,
 			},
 			&cli.StringFlag{
 				Name:        "pushover-app-token",
@@ -67,7 +63,8 @@ func main() {
 		DefaultCommand: "watch",
 		Commands: []*cli.Command{
 			{
-				Name: "watch",
+				Name:  "watch",
+				Usage: "Watch for new tour availabilities",
 				Flags: []cli.Flag{
 					&cli.DurationFlag{
 						Name:        "interval",
@@ -77,7 +74,6 @@ func main() {
 						EnvVars:     []string{"INTERVAL"},
 					},
 				},
-				Description: "Watch for new tour availabilities",
 				Action: func(ctx *cli.Context) error {
 					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
 					if err != nil {
@@ -88,8 +84,8 @@ func main() {
 				},
 			},
 			{
-				Name:        "update",
-				Description: "Update local data",
+				Name:  "update",
+				Usage: "Update latest availabilities",
 				Action: func(ctx *cli.Context) error {
 					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
 					if err != nil {
@@ -116,8 +112,8 @@ func main() {
 				},
 			},
 			{
-				Name:        "details",
-				Description: "print details from details API",
+				Name:  "details",
+				Usage: "Print details from details API",
 				Action: func(ctx *cli.Context) error {
 					sc, err := storage.New(dbFilename)
 					if err != nil {
@@ -145,8 +141,17 @@ func main() {
 				},
 			},
 			{
-				Name:        "chat",
-				Description: "chat with an AI model about the tour dates",
+				Name:  "chat",
+				Usage: "Chat with an AI model about the tour dates",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "model",
+						Usage:       "model name to interact with in Ollama",
+						Destination: &model,
+						EnvVars:     []string{"MODEL"},
+						Value:       "qwen2.5:7b",
+					},
+				},
 				Action: func(ctx *cli.Context) error {
 					sc, err := storage.New(dbFilename)
 					if err != nil {
@@ -162,20 +167,42 @@ func main() {
 				},
 			},
 			{
-				Name:        "search",
-				Description: "search for tours",
+				Name:  "search",
+				Usage: "Search for availability of a specified tour in a date range",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "tour-id",
+						Usage:       "UUID of a tour to get availability for",
+						Destination: &tourID,
+						Required:    true,
+					},
+					&cli.TimestampFlag{
+						Name:        "start",
+						Usage:       "Date to start the search from",
+						Destination: &searchStart,
+						Layout:      time.DateOnly,
+						Required:    true,
+					},
+					&cli.TimestampFlag{
+						Name:        "end",
+						Usage:       "Date to end the search at",
+						Destination: &searchEnd,
+						Layout:      time.DateOnly,
+						Required:    true,
+					},
+				},
 				Action: func(ctx *cli.Context) error {
-					tour := tours.TourDetail{
-						Name:      "VIP Vatican Key Master's Tour: Unlock the Sistine Chapel",
-						Link:      "https://www.walksofitaly.com/vatican-tours/key-masters-tour-sistine-chapel-vatican-museums/",
-						ProductID: uuid.MustParse("e9d2d819-5f04-4b1f-a07f-612387494b8f"),
+					tourUUID, err := uuid.Parse(tourID)
+					if err != nil {
+						return err
 					}
 
-					start := tours.DateFromTime(time.Now())
-					end := start.Add(1, 0, 0)
-					availability, err := tour.FindAvailability(ctx.Context, accessToken, start, end, func(a tours.AvailabilityDetail) bool {
-						return a.Vacancies >= 7
-					})
+					tour := tours.TourDetail{
+						Name:      "User-provided tour ID",
+						ProductID: tourUUID,
+					}
+
+					availability, err := tour.GetAvailability(ctx.Context, accessToken, tours.DateFromTime(*searchStart.Value()), tours.DateFromTime(*searchEnd.Value()))
 					if err != nil {
 						return fmt.Errorf("error getting availability: %w", err)
 					}
@@ -189,7 +216,8 @@ func main() {
 				},
 			},
 			{
-				Name: "serve",
+				Name:  "serve",
+				Usage: "Run server with API and UI. Also watches for new availability",
 				Flags: []cli.Flag{
 					&cli.DurationFlag{
 						Name:        "interval",
@@ -206,7 +234,6 @@ func main() {
 						EnvVars:     []string{"ADDR"},
 					},
 				},
-				Description: "Watch for new tour availabilities",
 				Action: func(ctx *cli.Context) error {
 					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
 					if err != nil {
@@ -215,6 +242,48 @@ func main() {
 					defer sc.Close()
 
 					return app.Run(ctx.Context, watchInterval)
+				},
+			},
+			{
+				Name:  "load",
+				Usage: "Load data from a JSON file into the DB",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "data",
+						Usage:       "filename for JSON data to load",
+						Destination: &dataFile,
+						TakesFile:   true,
+					},
+				},
+				Action: func(ctx *cli.Context) error {
+					sc, err := storage.New(dbFilename)
+					if err != nil {
+						return fmt.Errorf("error creating db client: %w", err)
+					}
+					defer sc.Close()
+
+					jsonData, err := os.ReadFile(dataFile)
+					if err != nil {
+						return fmt.Errorf("error reading JSON file: %w", err)
+					}
+
+					var tours []*tours.TourDetail
+					err = json.Unmarshal(jsonData, &tours)
+					if err != nil {
+						return fmt.Errorf("error parsing JSON data: %w", err)
+					}
+
+					for _, td := range tours {
+						if td.ProductID == (uuid.UUID{}) {
+							td.ProductID = uuid.New()
+						}
+						err = sc.Set(ctx.Context, td)
+						if err != nil {
+							return fmt.Errorf("error inserting tour %q: %w", td.Name, err)
+						}
+					}
+
+					return nil
 				},
 			},
 		},
