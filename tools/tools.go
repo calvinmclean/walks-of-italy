@@ -14,8 +14,6 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
-// TODO: use struct tags to create api.Tool?
-
 type Tools struct {
 	sc          *storage.Client
 	accessToken string
@@ -27,11 +25,7 @@ func New(sc *storage.Client, accessToken string) Tools {
 	return Tools{sc: sc, accessToken: accessToken, logger: *slog.Default(), cache: map[string]string{}}
 }
 
-type CacheKey interface {
-	CacheKey() string
-}
-
-func executeToolFunction[T CacheKey](cache map[string]string, args map[string]any, runTool func(T) (string, error)) (string, error) {
+func executeToolFunction[T interface{ CacheKey() string }](cache map[string]string, args map[string]any, runTool func(T) (string, error)) (string, error) {
 	var input T
 	dec, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		DecodeHook: mapstructure.TextUnmarshallerHookFunc(),
