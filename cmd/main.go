@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 
+	"walks-of-italy/ai"
 	"walks-of-italy/app"
 	"walks-of-italy/storage"
 	"walks-of-italy/tours"
@@ -19,7 +20,7 @@ import (
 
 func main() {
 	var debug bool
-	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr, accessToken string
+	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr, accessToken, model string
 	var watchInterval time.Duration
 	app := &cli.App{
 		Name: "walks-of-italy",
@@ -36,6 +37,13 @@ func main() {
 				Destination: &dbFilename,
 				EnvVars:     []string{"DB"},
 				Value:       "file::memory:?cache=shared",
+			},
+			&cli.StringFlag{
+				Name:        "model",
+				Usage:       "model name to interact with in Ollama",
+				Destination: &model,
+				EnvVars:     []string{"MODEL"},
+				Value:       "qwen2.5:7b",
 			},
 			&cli.StringFlag{
 				Name:        "pushover-app-token",
@@ -134,6 +142,23 @@ func main() {
 					}
 
 					return nil
+				},
+			},
+			{
+				Name:        "chat",
+				Description: "chat with an AI model about the tour dates",
+				Action: func(ctx *cli.Context) error {
+					sc, err := storage.New(dbFilename)
+					if err != nil {
+						return fmt.Errorf("error creating db client: %w", err)
+					}
+					defer sc.Close()
+
+					if debug {
+						slog.SetLogLoggerLevel(slog.LevelDebug)
+					}
+
+					return ai.Chat(sc, model, accessToken)
 				},
 			},
 			{
