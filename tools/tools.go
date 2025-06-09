@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"time"
 
 	"walks-of-italy/storage"
 	"walks-of-italy/tours"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/ollama/ollama/api"
 )
+
+// TODO: use struct tags to create api.Tool?
 
 type Tools struct {
 	sc          *storage.Client
@@ -25,89 +27,66 @@ func New(sc *storage.Client, accessToken string) Tools {
 	return Tools{sc: sc, accessToken: accessToken, logger: *slog.Default(), cache: map[string]string{}}
 }
 
-func (t Tools) Execute(name string, args map[string]any) (string, error) {
+type CacheKey interface {
+	CacheKey() string
+}
+
+func executeToolFunction[T CacheKey](cache map[string]string, args map[string]any, runTool func(T) (string, error)) (string, error) {
+	var input T
+	dec, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: mapstructure.TextUnmarshallerHookFunc(),
+		Result:     &input,
+	})
+
+	err := dec.Decode(args)
+	if err != nil {
+		return "", fmt.Errorf("error decoding input: %w", err)
+	}
+
+	cacheVal, ok := cache[input.CacheKey()]
+	if ok {
+		return cacheVal, nil
+	}
+
+	output, err := runTool(input)
+	if err != nil {
+		return "", err
+	}
+
+	cache[input.CacheKey()] = output
+
+	return output, nil
+}
+
+func (t Tools) Execute(name string, args map[string]any) (output string, _ error) {
 	t.logger.With("name", name, "args", args).Info("tool call")
+
+	defer func(out *string) {
+		if out == nil {
+			return
+		}
+		t.logger.With("name", name, "args", args, "output", *out).Info("tool call done")
+	}(&output)
+
 	switch name {
 	case "getAllTours":
-		cacheVal, ok := t.cache["getAllTours"]
-		if ok {
-			return cacheVal, nil
-		}
-
-		output, err := t.GetAllTours()
-		if err != nil {
-			return "", err
-		}
-
-		t.cache["getAllTours"] = output
-
-		return output, nil
+		return executeToolFunction(t.cache, args, t.GetAllTours)
 	case "getTourDetails":
-		id, ok := args["tour_id"].(string)
-		if !ok {
-			return "", fmt.Errorf("missing tour_id argument: %v", args)
-		}
-
-		cacheKey := "getTourDetails_" + id
-
-		cacheVal, ok := t.cache[cacheKey]
-		if ok {
-			return cacheVal, nil
-		}
-
-		output, err := t.GetTourDetails(id)
-		if err != nil {
-			return "", fmt.Errorf("error getting tour details: %w", err)
-		}
-
-		t.cache[cacheKey] = output
-
-		return output, nil
+		return executeToolFunction(t.cache, args, t.GetTourDetails)
 	case "getTourAvailability":
-		id, ok := args["tour_id"].(string)
-		if !ok {
-			return "", fmt.Errorf("missing tour_id argument: %v", args)
-		}
-		start, ok := args["start"].(string)
-		if !ok {
-			return "", fmt.Errorf("missing start argument: %v", args)
-		}
-		end, ok := args["end"].(string)
-		if !ok {
-			return "", fmt.Errorf("missing end argument: %v", args)
-		}
-
-		cacheKey := fmt.Sprintf("getTourDetails_%s_%s_%s", id, start, end)
-		cacheVal, ok := t.cache[cacheKey]
-		if ok {
-			return cacheVal, nil
-		}
-
-		startTime, err := time.Parse(time.DateOnly, start)
-		if err != nil {
-			return "", fmt.Errorf("error parsing start: %w", err)
-		}
-		endTime, err := time.Parse(time.DateOnly, end)
-		if err != nil {
-			return "", fmt.Errorf("error parsing end: %w", err)
-		}
-
-		output, err := t.GetAvailability(id, tours.DateFromTime(startTime), tours.DateFromTime(endTime))
-		if err != nil {
-			return "", fmt.Errorf("error getting tour details: %w", err)
-		}
-
-		t.cache[cacheKey] = output
-
-		t.logger.With("name", name, "output", string(output)).Info("success")
-
-		return output, nil
+		return executeToolFunction(t.cache, args, t.GetAvailability)
 	default:
 		return "", fmt.Errorf("unknown function: %q", name)
 	}
 }
 
-func (t Tools) GetAllTours() (string, error) {
+type GetAllToursInput struct{}
+
+func (GetAllToursInput) CacheKey() string {
+	return "getAllTours"
+}
+
+func (t Tools) GetAllTours(GetAllToursInput) (string, error) {
 	allTours, err := t.sc.GetAll(context.Background(), url.Values{})
 	if err != nil {
 		return "", fmt.Errorf("error getting tours: %w", err)
@@ -127,8 +106,16 @@ func (t Tools) GetAllTours() (string, error) {
 	return string(out), err
 }
 
-func (t Tools) GetTourDetails(id string) (string, error) {
-	tour, err := t.sc.Get(context.Background(), id)
+type GetTourDetailsInput struct {
+	TourID string `mapstructure:"tour_id"`
+}
+
+func (g GetTourDetailsInput) CacheKey() string {
+	return "getTourDetails_" + g.TourID
+}
+
+func (t Tools) GetTourDetails(in GetTourDetailsInput) (string, error) {
+	tour, err := t.sc.Get(context.Background(), in.TourID)
 	if err != nil {
 		return "", fmt.Errorf("error getting tour: %w", err)
 	}
@@ -138,16 +125,27 @@ func (t Tools) GetTourDetails(id string) (string, error) {
 		return "", fmt.Errorf("error getting description for %q: %w", tour.Name, err)
 	}
 
-	return string(desc), err
+	out, err := json.Marshal(desc)
+	return string(out), err
 }
 
-func (t Tools) GetAvailability(id string, start, end tours.Date) (string, error) {
-	tour, err := t.sc.Get(context.Background(), id)
+type GetAvailabilityInput struct {
+	TourID string     `mapstructure:"tour_id"`
+	Start  tours.Date `mapstructure:"start"`
+	End    tours.Date `mapstructure:"end"`
+}
+
+func (g GetAvailabilityInput) CacheKey() string {
+	return fmt.Sprintf("getTourDetails_%s_%s_%s", g.TourID, g.Start.String(), g.End.String())
+}
+
+func (t Tools) GetAvailability(in GetAvailabilityInput) (string, error) {
+	tour, err := t.sc.Get(context.Background(), in.TourID)
 	if err != nil {
 		return "", fmt.Errorf("error getting tour: %w", err)
 	}
 
-	avail, err := tour.GetAvailability(context.Background(), t.accessToken, start, end)
+	avail, err := tour.GetAvailability(context.Background(), t.accessToken, in.Start, in.End)
 	if err != nil {
 		return "", fmt.Errorf("error getting description for %q: %w", tour.Name, err)
 	}

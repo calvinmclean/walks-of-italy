@@ -129,7 +129,7 @@ func main() {
 						}
 
 						fmt.Println(td.Name)
-						fmt.Println(string(desc))
+						fmt.Println(desc)
 						fmt.Println()
 					}
 

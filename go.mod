@@ -10,6 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gregdel/pushover v1.3.1
 	github.com/mattn/go-sqlite3 v1.14.28
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/ollama/ollama v0.9.0
 	github.com/urfave/cli/v2 v2.27.6
 )

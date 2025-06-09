@@ -39,3 +39,15 @@ func (d Date) MarshalJSON() ([]byte, error) {
 func (d Date) String() string {
 	return fmt.Sprintf("%04d-%02d-%02d", d.Year, d.Month, d.Day)
 }
+
+func (d *Date) UnmarshalText(in []byte) error {
+	t, err := time.Parse(time.DateOnly, string(in))
+	if err != nil {
+		return err
+	}
+
+	d.Year = t.Year()
+	d.Month = t.Month()
+	d.Day = t.Day()
+	return nil
+}
