@@ -144,7 +144,10 @@ func (t Tools) GetAvailability(in GetAvailabilityInput) (string, error) {
 		return "", fmt.Errorf("error getting description for %q: %w", tour.Name, err)
 	}
 
-	output, err := json.Marshal(avail)
+	output, err := json.Marshal(map[string]any{
+		"availability": avail,
+		"instruction":  "tell the user about availability. do not describe the json structure.",
+	})
 	if err != nil {
 		return "", err
 	}

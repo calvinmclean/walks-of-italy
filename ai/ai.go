@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"walks-of-italy/ai/tools"
@@ -20,19 +21,11 @@ func Chat(sc *storage.Client, model, accessToken string) error {
 		return err
 	}
 
-	printer := make(chan string)
-	go func() {
-		for c := range printer {
-			fmt.Print(c)
-		}
-	}()
-
 	walksTools := tools.New(sc, accessToken, *slog.Default())
 
 	allTours, _ := walksTools.GetAllTours(tools.GetAllToursInput{})
 
 	ch := &chatHandler{
-		printer: printer,
 		messages: []api.Message{
 			{
 				Role:    "system",
@@ -40,7 +33,7 @@ func Chat(sc *storage.Client, model, accessToken string) error {
 			},
 			{
 				Role:    "system",
-				Content: "Here are the tours: " + allTours,
+				Content: fmt.Sprintf("Here are the tours: %s. Use this information if the user asks about a specific tour.", allTours),
 			},
 		},
 		client: client,
@@ -81,11 +74,22 @@ func (ch *chatHandler) doChat(model string) error {
 			Model:    model,
 			Messages: ch.messages,
 			Tools:    ch.walks.Tools(),
+			Think:    new(bool),
 		}
+
+		ch.responseMessage = []string{}
 
 		err := ch.client.Chat(ctx, req, ch.handleResponse)
 		if err != nil {
 			return err
+		}
+
+		if len(ch.responseMessage) > 0 {
+			content := strings.Join(ch.responseMessage, "")
+			ch.messages = append(ch.messages, api.Message{
+				Role:    "assistant",
+				Content: content,
+			})
 		}
 	}
 
@@ -94,9 +98,11 @@ func (ch *chatHandler) doChat(model string) error {
 
 type chatHandler struct {
 	client   *api.Client
-	printer  chan<- string
 	messages []api.Message
 	walks    tools.Tools
+
+	// Collect the streamed response to add to the history after completing the response
+	responseMessage []string
 
 	usingTool bool
 	done      bool
@@ -104,6 +110,8 @@ type chatHandler struct {
 
 func (ch *chatHandler) handleResponse(resp api.ChatResponse) error {
 	if len(resp.Message.ToolCalls) > 0 {
+		ch.messages = append(ch.messages, resp.Message)
+
 		ch.usingTool = true
 
 		tc := resp.Message.ToolCalls[0].Function
@@ -119,7 +127,10 @@ func (ch *chatHandler) handleResponse(resp api.ChatResponse) error {
 		return nil
 	}
 
-	ch.printer <- resp.Message.Content
+	fmt.Print(resp.Message.Content)
+	if len(resp.Message.Content) > 0 {
+		ch.responseMessage = append(ch.responseMessage, resp.Message.Content)
+	}
 
 	// After receiving the ToolCall response, the model will respond "done", but still needs to
 	// answer the prompt
