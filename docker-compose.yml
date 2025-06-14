@@ -1,14 +1,20 @@
 services:
   walks-of-italy:
     image: "ghcr.io/calvinmclean/walks-of-italy:latest"
+    ports:
+      - "7077:7077"
     volumes:
       - "./data:/data"
     command:
-      - "watch"
+      - "serve"
     user: 1000:1000
+    restart: unless-stopped
     environment:
       DB: /data/walks-of-italy.db
       DEBUG: true
       INTERVAL: 1h
       PUSHOVER_APP_TOKEN: ""
       PUSHOVER_RECIPIENT_TOKEN: ""
+      ADDR: ":7077"
+      VENTRATA_TOKEN: ""
+      WALKS_TOKEN: ""
