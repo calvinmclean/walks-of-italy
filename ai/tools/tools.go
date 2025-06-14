@@ -15,14 +15,21 @@ import (
 )
 
 type Tools struct {
-	sc          *storage.Client
-	accessToken string
-	logger      slog.Logger
-	cache       map[string]string
+	sc            *storage.Client
+	ventrataToken string
+	walksToken    string
+	logger        slog.Logger
+	cache         map[string]string
 }
 
-func New(sc *storage.Client, accessToken string, logger slog.Logger) Tools {
-	return Tools{sc: sc, accessToken: accessToken, logger: logger, cache: map[string]string{}}
+func New(sc *storage.Client, ventrataToken, walksToken string, logger slog.Logger) Tools {
+	return Tools{
+		sc:            sc,
+		ventrataToken: ventrataToken,
+		walksToken:    walksToken,
+		logger:        logger,
+		cache:         map[string]string{},
+	}
 }
 
 func executeToolFunction[T interface{ CacheKey() string }](cache map[string]string, args map[string]any, runTool func(T) (string, error)) (string, error) {
@@ -114,7 +121,7 @@ func (t Tools) GetTourDetails(in GetTourDetailsInput) (string, error) {
 		return "", fmt.Errorf("error getting tour: %w", err)
 	}
 
-	desc, err := tour.GetDescription(context.Background(), tour.ApiUrl)
+	desc, err := tour.GetDescription(context.Background(), tour.ApiUrl, t.walksToken)
 	if err != nil {
 		return "", fmt.Errorf("error getting description for %q: %w", tour.Name, err)
 	}
@@ -139,7 +146,7 @@ func (t Tools) GetAvailability(in GetAvailabilityInput) (string, error) {
 		return "", fmt.Errorf("error getting tour: %w", err)
 	}
 
-	avail, err := tour.GetAvailability(context.Background(), t.accessToken, in.Start, in.End)
+	avail, err := tour.GetAvailability(context.Background(), t.ventrataToken, in.Start, in.End)
 	if err != nil {
 		return "", fmt.Errorf("error getting description for %q: %w", tour.Name, err)
 	}

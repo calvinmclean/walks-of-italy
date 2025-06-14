@@ -21,7 +21,7 @@ import (
 
 func main() {
 	var debug bool
-	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr, accessToken, model, dataFile, tourID string
+	var dbFilename, pushoverAppToken, pushoverRecipientToken, addr, ventrataToken, walksToken, model, dataFile, tourID string
 	var watchInterval time.Duration
 	var searchStart, searchEnd cli.Timestamp
 	app := &cli.App{
@@ -54,10 +54,16 @@ func main() {
 				EnvVars:     []string{"PUSHOVER_RECIPIENT_TOKEN"},
 			},
 			&cli.StringFlag{
-				Name:        "access-token",
+				Name:        "ventrata-token",
+				Usage:       "Access token for Ventrata booking API",
+				Destination: &ventrataToken,
+				EnvVars:     []string{"VENTRATA_TOKEN"},
+			},
+			&cli.StringFlag{
+				Name:        "walks-token",
 				Usage:       "Access token for Walks of Italy API",
-				Destination: &accessToken,
-				EnvVars:     []string{"ACCESS_TOKEN"},
+				Destination: &walksToken,
+				EnvVars:     []string{"WALKS_TOKEN"},
 			},
 		},
 		DefaultCommand: "watch",
@@ -75,7 +81,7 @@ func main() {
 					},
 				},
 				Action: func(ctx *cli.Context) error {
-					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, ventrataToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}
@@ -87,7 +93,7 @@ func main() {
 				Name:  "update",
 				Usage: "Update latest availabilities",
 				Action: func(ctx *cli.Context) error {
-					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, ventrataToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}
@@ -127,7 +133,7 @@ func main() {
 					}
 
 					for _, td := range allTours {
-						desc, err := td.GetDescription(context.Background(), td.ApiUrl)
+						desc, err := td.GetDescription(context.Background(), walksToken, td.ApiUrl)
 						if err != nil {
 							return fmt.Errorf("error getting description for %q: %w", td.Name, err)
 						}
@@ -163,7 +169,7 @@ func main() {
 						slog.SetLogLoggerLevel(slog.LevelDebug)
 					}
 
-					return ai.Chat(sc, model, accessToken)
+					return ai.Chat(sc, model, ventrataToken, walksToken)
 				},
 			},
 			{
@@ -202,7 +208,7 @@ func main() {
 						ProductID: tourUUID,
 					}
 
-					availability, err := tour.GetAvailability(ctx.Context, accessToken, tours.DateFromTime(*searchStart.Value()), tours.DateFromTime(*searchEnd.Value()))
+					availability, err := tour.GetAvailability(ctx.Context, ventrataToken, tours.DateFromTime(*searchStart.Value()), tours.DateFromTime(*searchEnd.Value()))
 					if err != nil {
 						return fmt.Errorf("error getting availability: %w", err)
 					}
@@ -235,7 +241,7 @@ func main() {
 					},
 				},
 				Action: func(ctx *cli.Context) error {
-					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, accessToken, debug)
+					app, sc, err := setupApp(addr, dbFilename, pushoverAppToken, pushoverRecipientToken, ventrataToken, debug)
 					if err != nil {
 						return fmt.Errorf("error creating app: %w", err)
 					}

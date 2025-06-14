@@ -15,13 +15,13 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
-func Chat(sc *storage.Client, model, accessToken string) error {
+func Chat(sc *storage.Client, model, ventrataToken, walksToken string) error {
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
 		return err
 	}
 
-	walksTools := tools.New(sc, accessToken, *slog.Default())
+	walksTools := tools.New(sc, ventrataToken, walksToken, *slog.Default())
 
 	allTours, _ := walksTools.GetAllTours(tools.GetAllToursInput{})
 

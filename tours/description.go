@@ -8,11 +8,13 @@ import (
 	"net/http"
 )
 
-func (td TourDetail) GetDescription(ctx context.Context, url string) (Description, error) {
+func (td TourDetail) GetDescription(ctx context.Context, url, accessToken string) (Description, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return Description{}, fmt.Errorf("error creating request: %w", err)
 	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

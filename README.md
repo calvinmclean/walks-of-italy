@@ -8,12 +8,14 @@ Additionally, you can use the integrated AI tools and chat command with local Ol
 
 ## How To
 
-This application uses the Ventrata API for Walks of Italy tours. It requires an access token to get this data. You can get this token by accessing a tour page and searching `api.ventrata.com/octo/availability` in the Network tab of developer console. The token is shown in the `Authorization` header of requests.
+This application uses the Ventrata API for Walks of Italy tours. It requires a token to get this data. You can get this token by accessing a tour page and searching `api.ventrata.com/octo/availability` in the Network tab of developer console. The token is shown in the `Authorization` header of requests.
+
+If you want to use the AI chat with access to the descriptions API, you also need the token to access `tour-api.walks.org` which can be founds similarly to the previous example.
 
 Now that you have a token, you can use the CLI:
 
 ```shell
-export ACCESS_TOKEN=token
+export VENTRATA_TOKEN=token
 
 go run cmd/walks-of-italy/main.go \
   search \
@@ -41,7 +43,7 @@ curl localhost:7077/tours -H "Content-Type: application/json" -X POST -d '{"Name
 ### Run Server
 
 ```shell
-export ACCESS_TOKEN=token
+export VENTRATA_TOKEN=token
 
 go run cmd/walks-of-italy/main.go \
   --db walks-of-italy.db \
@@ -55,7 +57,7 @@ Then, visit http://localhost:7077 to see the UI!
 With Ollama running locally, you can chat about the tours you have in the DB:
 
 ```shell
-export ACCESS_TOKEN=token
+export VENTRATA_TOKEN=token
 
 go run cmd/walks-of-italy/main.go \
   --db server-backup.db \
